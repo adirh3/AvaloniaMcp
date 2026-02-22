@@ -1,0 +1,7 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/AvaloniaMcp.Diagnostics/AvaloniaMcp.Diagnostics.csproj" />
+    <Project Path="src/AvaloniaMcp.Server/AvaloniaMcp.Server.csproj" />
+    <Project Path="src/AvaloniaMcp.Demo/AvaloniaMcp.Demo.csproj" />
+  </Folder>
+</Solution>

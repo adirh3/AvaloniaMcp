@@ -1,0 +1,17 @@
+## Build outputs
+bin/
+obj/
+nupkg/
+
+## IDE
+.vs/
+*.user
+*.suo
+
+## OS
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+## Screenshots (testing artifacts)
+screenshot_*.png

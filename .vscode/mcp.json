@@ -1,0 +1,9 @@
+{
+  "servers": {
+    "avalonia-mcp": {
+      "type": "stdio",
+      "command": "dotnet",
+      "args": ["avalonia-mcp"]
+    }
+  }
+}

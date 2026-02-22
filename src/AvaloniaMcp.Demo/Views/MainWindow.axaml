@@ -1,0 +1,97 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:AvaloniaMcp.Demo.ViewModels"
+        x:Class="AvaloniaMcp.Demo.Views.MainWindow"
+        x:DataType="vm:MainViewModel"
+        Title="AvaloniaMcp Demo" Width="700" Height="600"
+        WindowStartupLocation="CenterScreen">
+
+    <Window.Styles>
+        <Style Selector="TextBlock.header">
+            <Setter Property="FontSize" Value="20"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Margin" Value="0,0,0,12"/>
+        </Style>
+        <Style Selector="Border.card">
+            <Setter Property="Background" Value="#F5F5F5"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="16"/>
+            <Setter Property="Margin" Value="0,0,0,12"/>
+        </Style>
+    </Window.Styles>
+
+    <ScrollViewer>
+        <StackPanel Margin="24" Spacing="8">
+
+            <!-- Header -->
+            <TextBlock Name="HeaderText" Text="{Binding Greeting}" Classes="header"
+                       Foreground="{DynamicResource AccentBrush}"/>
+
+            <!-- Input Section -->
+            <Border Classes="card">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Input Controls" FontWeight="SemiBold"/>
+                    <TextBox Name="MainInput" Watermark="Type something..."
+                             Text="{Binding InputText, Mode=TwoWay}"/>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Name="IncrementBtn" Content="Click Me" Command="{Binding IncrementCommand}"/>
+                        <Button Name="AddItemBtn" Content="Add Item" Command="{Binding AddItemCommand}"/>
+                        <Button Name="ResetBtn" Content="Reset" Command="{Binding ResetCommand}"
+                                Background="{DynamicResource WarningBrush}" Foreground="White"/>
+                    </StackPanel>
+                    <TextBlock Name="ClickCounter" Text="{Binding ClickCountText}"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Toggle & Slider -->
+            <Border Classes="card">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Toggle &amp; Slider" FontWeight="SemiBold"/>
+                    <ToggleSwitch Name="MainToggle" IsChecked="{Binding IsToggled}"
+                                  OnContent="Enabled" OffContent="Disabled"/>
+                    <Slider Name="MainSlider" Minimum="0" Maximum="100"
+                            Value="{Binding SliderValue}" TickFrequency="10" IsSnapToTickEnabled="True"/>
+                    <ProgressBar Name="ProgressIndicator" Value="{Binding SliderValue}"
+                                 Minimum="0" Maximum="100" Height="12"/>
+                </StackPanel>
+            </Border>
+
+            <!-- List Section -->
+            <Border Classes="card">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Items List" FontWeight="SemiBold"/>
+                    <ListBox Name="ItemsList" ItemsSource="{Binding Items}"
+                             SelectedItem="{Binding SelectedItem}" MaxHeight="120"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Todo List (DataGrid-like) -->
+            <Border Classes="card">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Todo List" FontWeight="SemiBold"/>
+                    <ItemsControl Name="TodoList" ItemsSource="{Binding Todos}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:TodoItem">
+                                <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,2">
+                                    <CheckBox IsChecked="{Binding IsDone}"/>
+                                    <TextBlock Text="{Binding Title}" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+
+            <!-- Intentional binding error for testing -->
+            <TextBlock Name="BrokenBinding" Text="{Binding NonExistentProperty}"
+                       Foreground="Red" IsVisible="False"/>
+
+            <!-- Status Bar -->
+            <Border Background="#E0E0E0" CornerRadius="4" Padding="8">
+                <TextBlock Name="StatusBar" Text="{Binding StatusMessage}"
+                           FontStyle="Italic" Foreground="#666"/>
+            </Border>
+
+        </StackPanel>
+    </ScrollViewer>
+</Window>
