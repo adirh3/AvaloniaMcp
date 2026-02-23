@@ -1,3 +1,4 @@
+using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 
 namespace AvaloniaMcp.Diagnostics.Protocol;
@@ -8,30 +9,45 @@ public sealed class DiagnosticRequest
     public string Method { get; set; } = "";
 
     [JsonPropertyName("params")]
-    public Dictionary<string, object?> Params { get; set; } = new();
+    public JsonObject Params { get; set; } = new();
 
     public string? GetString(string key)
     {
-        if (Params.TryGetValue(key, out var val) && val is System.Text.Json.JsonElement el)
+        if (Params.TryGetPropertyValue(key, out var node) && node is not null)
         {
-            return el.ValueKind == System.Text.Json.JsonValueKind.String
-                ? el.GetString()
-                : el.GetRawText();
+            return node.GetValueKind() == System.Text.Json.JsonValueKind.String
+                ? node.GetValue<string>()
+                : node.ToJsonString();
         }
-        return val?.ToString();
+        return null;
     }
 
     public int GetInt(string key, int defaultValue = 0)
     {
-        if (Params.TryGetValue(key, out var val) && val is System.Text.Json.JsonElement el && el.TryGetInt32(out var i))
-            return i;
+        if (Params.TryGetPropertyValue(key, out var node) && node is not null)
+        {
+            try { return node.GetValue<int>(); }
+            catch { return defaultValue; }
+        }
         return defaultValue;
     }
 
     public bool GetBool(string key, bool defaultValue = false)
     {
-        if (Params.TryGetValue(key, out var val) && val is System.Text.Json.JsonElement el)
-            return el.GetBoolean();
+        if (Params.TryGetPropertyValue(key, out var node) && node is not null)
+        {
+            try { return node.GetValue<bool>(); }
+            catch { return defaultValue; }
+        }
         return defaultValue;
     }
+}
+
+[JsonSerializable(typeof(DiagnosticRequest))]
+[JsonSerializable(typeof(DiagnosticResponse))]
+[JsonSerializable(typeof(JsonNode))]
+[JsonSerializable(typeof(JsonObject))]
+[JsonSerializable(typeof(JsonArray))]
+internal partial class DiagnosticJsonContext : JsonSerializerContext
+{
 }

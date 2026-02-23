@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using System.Text.Json.Nodes;
 using AvaloniaMcp.Diagnostics.Protocol;
 
 namespace AvaloniaMcp.Diagnostics.Handlers;
@@ -13,20 +14,25 @@ internal static class InspectionHandler
         return await Dispatcher.UIThread.InvokeAsync(() =>
         {
             var windows = ControlResolver.GetWindows();
-            var result = windows.Select((w, i) => new Dictionary<string, object?>
+            var result = new JsonArray();
+            for (int i = 0; i < windows.Count; i++)
             {
-                ["index"] = i,
-                ["title"] = w.Title,
-                ["type"] = w.GetType().Name,
-                ["width"] = w.Width,
-                ["height"] = w.Height,
-                ["clientWidth"] = w.ClientSize.Width,
-                ["clientHeight"] = w.ClientSize.Height,
-                ["isActive"] = w.IsActive,
-                ["isVisible"] = w.IsVisible,
-                ["windowState"] = w.WindowState.ToString(),
-                ["position"] = w.Position.ToString(),
-            }).ToList();
+                var w = windows[i];
+                result.Add(new JsonObject
+                {
+                    ["index"] = i,
+                    ["title"] = w.Title,
+                    ["type"] = w.GetType().Name,
+                    ["width"] = w.Width,
+                    ["height"] = w.Height,
+                    ["clientWidth"] = w.ClientSize.Width,
+                    ["clientHeight"] = w.ClientSize.Height,
+                    ["isActive"] = w.IsActive,
+                    ["isVisible"] = w.IsVisible,
+                    ["windowState"] = w.WindowState.ToString(),
+                    ["position"] = w.Position.ToString(),
+                });
+            }
 
             return DiagnosticResponse.Ok(result);
         });
@@ -95,7 +101,7 @@ internal static class InspectionHandler
             var text = req.GetString("text");
             var maxResults = req.GetInt("maxResults", 20);
 
-            var results = new List<Dictionary<string, object?>>();
+            var results = new JsonArray();
 
             foreach (var window in ControlResolver.GetWindows())
             {
@@ -145,7 +151,7 @@ internal static class InspectionHandler
                     return DiagnosticResponse.Ok(node);
                 }
             }
-            return DiagnosticResponse.Ok(new { message = "No element is focused" });
+            return DiagnosticResponse.Ok(new JsonObject { ["message"] = "No element is focused" });
         });
     }
 }

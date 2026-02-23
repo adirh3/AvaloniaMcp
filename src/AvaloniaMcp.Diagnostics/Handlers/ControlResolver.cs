@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.LogicalTree;
 using Avalonia.VisualTree;
+using System.Text.Json.Nodes;
 
 namespace AvaloniaMcp.Diagnostics.Handlers;
 
@@ -92,11 +93,11 @@ internal static class ControlResolver
     }
 
     /// <summary>
-    /// Serialize a visual tree node to a dictionary for JSON output.
+    /// Serialize a visual tree node to a JsonObject for AOT-safe JSON output.
     /// </summary>
-    public static Dictionary<string, object?> SerializeNode(Visual visual, int maxDepth, int currentDepth = 0)
+    public static JsonObject SerializeNode(Visual visual, int maxDepth, int currentDepth = 0)
     {
-        var node = new Dictionary<string, object?>
+        var node = new JsonObject
         {
             ["type"] = visual.GetType().Name,
         };
@@ -109,12 +110,12 @@ internal static class ControlResolver
             node["isEnabled"] = c.IsEnabled;
         }
 
-        node["bounds"] = new
+        node["bounds"] = new JsonObject
         {
-            x = visual.Bounds.X,
-            y = visual.Bounds.Y,
-            width = visual.Bounds.Width,
-            height = visual.Bounds.Height,
+            ["x"] = visual.Bounds.X,
+            ["y"] = visual.Bounds.Y,
+            ["width"] = visual.Bounds.Width,
+            ["height"] = visual.Bounds.Height,
         };
 
         if (visual is ContentControl cc && cc.Content is string text)
@@ -123,7 +124,12 @@ internal static class ControlResolver
             node["text"] = tb.Text;
 
         if (visual.Classes.Count > 0)
-            node["classes"] = visual.Classes.ToList();
+        {
+            var arr = new JsonArray();
+            foreach (var cls in visual.Classes)
+                arr.Add(cls);
+            node["classes"] = arr;
+        }
 
         if (visual.GetValue(Visual.OpacityProperty) is double op && Math.Abs(op - 1.0) > 0.01)
             node["opacity"] = op;
@@ -133,9 +139,10 @@ internal static class ControlResolver
             var children = visual.GetVisualChildren().ToList();
             if (children.Count > 0)
             {
-                node["children"] = children
-                    .Select(child => SerializeNode(child, maxDepth, currentDepth + 1))
-                    .ToList();
+                var arr = new JsonArray();
+                foreach (var child in children)
+                    arr.Add(SerializeNode(child, maxDepth, currentDepth + 1));
+                node["children"] = arr;
             }
         }
         else
@@ -151,9 +158,9 @@ internal static class ControlResolver
     /// <summary>
     /// Serialize a logical tree node.
     /// </summary>
-    public static Dictionary<string, object?> SerializeLogicalNode(ILogical logical, int maxDepth, int currentDepth = 0)
+    public static JsonObject SerializeLogicalNode(ILogical logical, int maxDepth, int currentDepth = 0)
     {
-        var node = new Dictionary<string, object?>
+        var node = new JsonObject
         {
             ["type"] = logical.GetType().Name,
         };
@@ -175,9 +182,10 @@ internal static class ControlResolver
             var children = logical.GetLogicalChildren().ToList();
             if (children.Count > 0)
             {
-                node["children"] = children
-                    .Select(child => SerializeLogicalNode(child, maxDepth, currentDepth + 1))
-                    .ToList();
+                var arr = new JsonArray();
+                foreach (var child in children)
+                    arr.Add(SerializeLogicalNode(child, maxDepth, currentDepth + 1));
+                node["children"] = arr;
             }
         }
         else

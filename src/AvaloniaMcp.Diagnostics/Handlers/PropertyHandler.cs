@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Data;
@@ -20,7 +21,7 @@ internal static class PropertyHandler
             if (control is null)
                 return DiagnosticResponse.Fail($"Control '{controlId}' not found");
 
-            var props = new List<Dictionary<string, object?>>();
+            var props = new JsonArray();
 
             var registeredProps = AvaloniaPropertyRegistry.Instance.GetRegistered(control)
                 .Concat(AvaloniaPropertyRegistry.Instance.GetRegisteredAttached(control.GetType()));
@@ -30,16 +31,14 @@ internal static class PropertyHandler
                 try
                 {
                     var value = control.GetValue(prop);
-                    var entry = new Dictionary<string, object?>
+                    props.Add(new JsonObject
                     {
                         ["name"] = prop.Name,
                         ["propertyType"] = prop.PropertyType.Name,
                         ["ownerType"] = prop.OwnerType.Name,
                         ["value"] = SafeSerialize(value),
                         ["isSet"] = control.IsSet(prop),
-                    };
-
-                    props.Add(entry);
+                    });
                 }
                 catch
                 {
@@ -47,7 +46,7 @@ internal static class PropertyHandler
                 }
             }
 
-            var result = new Dictionary<string, object?>
+            var result = new JsonObject
             {
                 ["type"] = control.GetType().FullName,
                 ["name"] = control.Name,
@@ -71,9 +70,9 @@ internal static class PropertyHandler
 
             var dc = control.DataContext;
             if (dc is null)
-                return DiagnosticResponse.Ok(new { message = "DataContext is null", controlType = control.GetType().Name });
+                return DiagnosticResponse.Ok(new JsonObject { ["message"] = "DataContext is null", ["controlType"] = control.GetType().Name });
 
-            var result = new Dictionary<string, object?>
+            var result = new JsonObject
             {
                 ["controlType"] = control.GetType().Name,
                 ["controlName"] = control.Name,
@@ -94,32 +93,40 @@ internal static class PropertyHandler
             if (control is null)
                 return DiagnosticResponse.Fail($"Control '{controlId}' not found");
 
-            var result = new Dictionary<string, object?>
+            var classesArr = new JsonArray();
+            foreach (var cls in control.Classes)
+                classesArr.Add(cls);
+
+            var pseudoArr = new JsonArray();
+            foreach (var cls in control.Classes.Where(c => c.StartsWith(':')))
+                pseudoArr.Add(cls);
+
+            var result = new JsonObject
             {
                 ["type"] = control.GetType().Name,
                 ["name"] = control.Name,
-                ["classes"] = control.Classes.ToList(),
-                ["pseudoClasses"] = control.Classes.Where(c => c.StartsWith(':')).ToList(),
+                ["classes"] = classesArr,
+                ["pseudoClasses"] = pseudoArr,
             };
 
             // Get applied style setters
-            var appliedStyles = new List<Dictionary<string, object?>>();
+            var appliedStyles = new JsonArray();
             if (control is StyledElement styled)
             {
                 foreach (var style in styled.Styles)
                 {
                     if (style is Style s)
                     {
-                        var setters = new List<string>();
+                        var setters = new JsonArray();
                         foreach (var setter in s.Setters)
                         {
                             if (setter is Setter avSetter)
                             {
-                                setters.Add($"{avSetter.Property?.Name} = {SafeSerialize(avSetter.Value)}");
+                                setters.Add((JsonNode)$"{avSetter.Property?.Name} = {SafeSerialize(avSetter.Value)}");
                             }
                         }
 
-                        appliedStyles.Add(new Dictionary<string, object?>
+                        appliedStyles.Add(new JsonObject
                         {
                             ["selector"] = s.Selector?.ToString(),
                             ["setterCount"] = s.Setters.Count,
@@ -144,7 +151,7 @@ internal static class PropertyHandler
             if (control is null && Application.Current is not null)
                 control = null; // will use Application.Current below
 
-            var resources = new List<Dictionary<string, object?>>();
+            var resources = new JsonArray();
 
             IResourceDictionary? resDict = null;
             if (control is not null)
@@ -156,7 +163,7 @@ internal static class PropertyHandler
             {
                 foreach (var kvp in resDict)
                 {
-                    resources.Add(new Dictionary<string, object?>
+                    resources.Add(new JsonObject
                     {
                         ["key"] = kvp.Key?.ToString(),
                         ["valueType"] = kvp.Value?.GetType().Name,
@@ -170,7 +177,7 @@ internal static class PropertyHandler
                     {
                         foreach (var kvp in rd)
                         {
-                            resources.Add(new Dictionary<string, object?>
+                            resources.Add(new JsonObject
                             {
                                 ["key"] = kvp.Key?.ToString(),
                                 ["valueType"] = kvp.Value?.GetType().Name,
@@ -182,11 +189,11 @@ internal static class PropertyHandler
                 }
             }
 
-            return DiagnosticResponse.Ok(new
+            return DiagnosticResponse.Ok(new JsonObject
             {
-                controlType = control?.GetType().Name ?? "Application",
-                resourceCount = resources.Count,
-                resources,
+                ["controlType"] = control?.GetType().Name ?? "Application",
+                ["resourceCount"] = resources.Count,
+                ["resources"] = resources,
             });
         });
     }
@@ -196,15 +203,19 @@ internal static class PropertyHandler
         return await Dispatcher.UIThread.InvokeAsync(() =>
         {
             var errors = BindingErrorTracker.GetErrors();
-            return DiagnosticResponse.Ok(new
+            var errorsArr = new JsonArray();
+            foreach (var err in errors.TakeLast(100))
+                errorsArr.Add(JsonSerializer.SerializeToNode(err, BindingErrorJsonContext.Default.BindingErrorEntry)!);
+
+            return DiagnosticResponse.Ok(new JsonObject
             {
-                errorCount = errors.Count,
-                errors = errors.TakeLast(100).ToList(),
+                ["errorCount"] = errors.Count,
+                ["errors"] = errorsArr,
             });
         });
     }
 
-    private static object? SafeSerialize(object? value)
+    private static string? SafeSerialize(object? value)
     {
         if (value is null) return null;
         try
@@ -212,7 +223,7 @@ internal static class PropertyHandler
             var type = value.GetType();
             if (value is double d && (double.IsInfinity(d) || double.IsNaN(d))) return d.ToString();
             if (value is float f && (float.IsInfinity(f) || float.IsNaN(f))) return f.ToString();
-            if (type.IsPrimitive || value is string || value is decimal || value is DateTime) return value;
+            if (type.IsPrimitive || value is string || value is decimal || value is DateTime) return value.ToString();
             if (type.IsEnum) return value.ToString();
             if (value is Avalonia.Media.IBrush brush) return brush.ToString();
             if (value is Avalonia.Media.Color color) return color.ToString();
@@ -226,9 +237,9 @@ internal static class PropertyHandler
         }
     }
 
-    private static Dictionary<string, object?> SerializeObject(object obj)
+    private static JsonObject SerializeObject(object obj)
     {
-        var dict = new Dictionary<string, object?>();
+        var dict = new JsonObject();
         foreach (var prop in obj.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance))
         {
             try

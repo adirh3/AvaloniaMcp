@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
+using System.Text.Json.Nodes;
 using AvaloniaMcp.Diagnostics.Protocol;
 
 namespace AvaloniaMcp.Diagnostics.Handlers;
@@ -24,7 +25,7 @@ internal static class InteractionHandler
                 if (button.Command?.CanExecute(button.CommandParameter) == true)
                 {
                     button.Command.Execute(button.CommandParameter);
-                    return DiagnosticResponse.Ok(new { clicked = true, method = "command", controlType = control.GetType().Name });
+                    return DiagnosticResponse.Ok(new JsonObject { ["clicked"] = true, ["method"] = "command", ["controlType"] = control.GetType().Name });
                 }
             }
 
@@ -34,10 +35,10 @@ internal static class InteractionHandler
                 // Programmatically invoke click via reflection on the OnClick method
                 var onClickMethod = typeof(Avalonia.Controls.Button).GetMethod("OnClick", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
                 onClickMethod?.Invoke(btn2, null);
-                return DiagnosticResponse.Ok(new { clicked = true, method = "onClick", controlType = control.GetType().Name });
+                return DiagnosticResponse.Ok(new JsonObject { ["clicked"] = true, ["method"] = "onClick", ["controlType"] = control.GetType().Name });
             }
 
-            return DiagnosticResponse.Ok(new { clicked = false, message = "Control is not a Button and pointer simulation is not supported. Use set_property or input_text instead.", controlType = control.GetType().Name });
+            return DiagnosticResponse.Ok(new JsonObject { ["clicked"] = false, ["message"] = "Control is not a Button and pointer simulation is not supported. Use set_property or input_text instead.", ["controlType"] = control.GetType().Name });
         });
     }
 
@@ -66,7 +67,7 @@ internal static class InteractionHandler
             {
                 var converted = ConvertValue(value, prop.PropertyType);
                 control.SetValue(prop, converted);
-                return DiagnosticResponse.Ok(new { set = true, property = propertyName, newValue = value });
+                return DiagnosticResponse.Ok(new JsonObject { ["set"] = true, ["property"] = propertyName, ["newValue"] = value });
             }
             catch (Exception ex)
             {
@@ -89,13 +90,13 @@ internal static class InteractionHandler
             if (control is TextBox textBox)
             {
                 textBox.Text = text;
-                return DiagnosticResponse.Ok(new { typed = true, controlType = "TextBox", text });
+                return DiagnosticResponse.Ok(new JsonObject { ["typed"] = true, ["controlType"] = "TextBox", ["text"] = text });
             }
 
             if (control is AutoCompleteBox acb)
             {
                 acb.Text = text;
-                return DiagnosticResponse.Ok(new { typed = true, controlType = "AutoCompleteBox", text });
+                return DiagnosticResponse.Ok(new JsonObject { ["typed"] = true, ["controlType"] = "AutoCompleteBox", ["text"] = text });
             }
 
             return DiagnosticResponse.Fail($"Control type {control.GetType().Name} does not support text input. Use a TextBox or similar.");
@@ -134,12 +135,12 @@ internal static class InteractionHandler
             rtb.Save(ms);
             var base64 = Convert.ToBase64String(ms.ToArray());
 
-            return DiagnosticResponse.Ok(new
+            return DiagnosticResponse.Ok(new JsonObject
             {
-                format = "png",
-                width = pixelSize.Width,
-                height = pixelSize.Height,
-                base64Data = base64,
+                ["format"] = "png",
+                ["width"] = pixelSize.Width,
+                ["height"] = pixelSize.Height,
+                ["base64Data"] = base64,
             });
         });
     }

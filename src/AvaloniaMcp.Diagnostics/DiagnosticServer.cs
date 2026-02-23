@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.IO.Pipes;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using AvaloniaMcp.Diagnostics.Handlers;
 using System.Text.Json.Serialization;
 using AvaloniaMcp.Diagnostics.Protocol;
@@ -21,6 +22,7 @@ public sealed class DiagnosticServer : IDisposable
         WriteIndented = false,
         NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals,
         Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+        TypeInfoResolver = DiagnosticJsonContext.Default,
     };
 
     public string PipeName => _pipeName;
@@ -142,8 +144,7 @@ public sealed class DiagnosticServer : IDisposable
                 catch (Exception serEx)
                 {
                     Log($"Serialization error for '{request.Method}': {serEx.Message}");
-                    responseJson = JsonSerializer.Serialize(
-                        DiagnosticResponse.Fail($"Serialization error: {serEx.Message}"), JsonOptions);
+                    responseJson = $"{{\"success\":false,\"data\":null,\"error\":\"Serialization error: {serEx.Message.Replace("\"", "'")}\"}}";
                 }
 
                 try
@@ -194,7 +195,7 @@ public sealed class DiagnosticServer : IDisposable
             "set_property" => await InteractionHandler.SetProperty(request),
             "input_text" => await InteractionHandler.InputText(request),
             "take_screenshot" => await InteractionHandler.TakeScreenshot(request),
-            "ping" => DiagnosticResponse.Ok(new { status = "ok", pid = Environment.ProcessId }),
+            "ping" => DiagnosticResponse.Ok(new JsonObject { ["status"] = "ok", ["pid"] = Environment.ProcessId }),
             _ => DiagnosticResponse.Fail($"Unknown method: {request.Method}"),
         };
     }
@@ -206,14 +207,14 @@ public sealed class DiagnosticServer : IDisposable
             var dir = Path.Combine(Path.GetTempPath(), "avalonia-mcp");
             Directory.CreateDirectory(dir);
             var path = Path.Combine(dir, $"{Environment.ProcessId}.json");
-            var info = new
+            var info = new JsonObject
             {
-                pid = Environment.ProcessId,
-                pipeName = _pipeName,
-                processName = Process.GetCurrentProcess().ProcessName,
-                startTime = DateTime.UtcNow.ToString("O"),
+                ["pid"] = Environment.ProcessId,
+                ["pipeName"] = _pipeName,
+                ["processName"] = Process.GetCurrentProcess().ProcessName,
+                ["startTime"] = DateTime.UtcNow.ToString("O"),
             };
-            var json = JsonSerializer.Serialize(info, JsonOptions);
+            var json = info.ToJsonString();
             File.WriteAllText(path, json);
             Log($"Discovery file written: {path}");
         }
