@@ -48,13 +48,18 @@ builder.Services
             Avalonia UI debugging server. Connects to a running Avalonia application and provides tools to inspect, debug, and interact with the UI.
 
             RECOMMENDED WORKFLOW:
-            1. list_windows — see all open windows
-            2. get_visual_tree — inspect the control hierarchy of a window
-            3. find_control — search for specific controls by name, type, or text
-            4. get_control_properties — inspect all properties of a control
-            5. get_binding_errors — check for broken data bindings
-            6. get_data_context — inspect the ViewModel data
-            7. take_screenshot — capture a visual snapshot
+            1. discover_apps — find running Avalonia apps (returns PIDs)
+            2. list_windows — see all open windows (pass pid if multiple apps)
+            3. get_visual_tree — inspect the control hierarchy of a window
+            4. find_control — search for specific controls by name, type, or text
+            5. get_control_properties — inspect all properties of a control
+            6. get_binding_errors — check for broken data bindings
+            7. get_data_context — inspect the ViewModel data
+            8. take_screenshot — capture a visual snapshot
+
+            MULTIPLE APPS: If multiple Avalonia apps are running, call discover_apps first,
+            then pass the pid parameter to all subsequent tool calls to target the right app.
+            If only one app is running, pid is optional (auto-discovered).
 
             CONTROL IDENTIFIERS: Tools accept a controlId parameter:
             - '#MyButton' — find by Name property

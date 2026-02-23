@@ -12,8 +12,10 @@ public sealed class PropertyTools
     public static async Task<string> GetControlProperties(
         AvaloniaConnection connection,
         [Description("Control identifier: '#Name' to find by Name, or 'TypeName[index]' to find by type.")] string controlId,
+        [Description("Process ID of the Avalonia app to connect to. If omitted, auto-discovers.")] int? pid = null,
         CancellationToken ct = default)
     {
+        if (pid.HasValue) connection.SwitchTo(pid.Value);
         return await connection.RequestAsync("get_control_properties", new()
         {
             ["controlId"] = controlId,
@@ -25,8 +27,10 @@ public sealed class PropertyTools
     public static async Task<string> GetDataContext(
         AvaloniaConnection connection,
         [Description("Control identifier. If omitted, returns the main window's DataContext.")] string? controlId = null,
+        [Description("Process ID of the Avalonia app to connect to. If omitted, auto-discovers.")] int? pid = null,
         CancellationToken ct = default)
     {
+        if (pid.HasValue) connection.SwitchTo(pid.Value);
         return await connection.RequestAsync("get_data_context", new()
         {
             ["controlId"] = controlId,
@@ -38,8 +42,10 @@ public sealed class PropertyTools
     public static async Task<string> GetAppliedStyles(
         AvaloniaConnection connection,
         [Description("Control identifier.")] string controlId,
+        [Description("Process ID of the Avalonia app to connect to. If omitted, auto-discovers.")] int? pid = null,
         CancellationToken ct = default)
     {
+        if (pid.HasValue) connection.SwitchTo(pid.Value);
         return await connection.RequestAsync("get_applied_styles", new()
         {
             ["controlId"] = controlId,
@@ -51,8 +57,10 @@ public sealed class PropertyTools
     public static async Task<string> GetResources(
         AvaloniaConnection connection,
         [Description("Control identifier. If omitted, returns application resources.")] string? controlId = null,
+        [Description("Process ID of the Avalonia app to connect to. If omitted, auto-discovers.")] int? pid = null,
         CancellationToken ct = default)
     {
+        if (pid.HasValue) connection.SwitchTo(pid.Value);
         return await connection.RequestAsync("get_resources", new()
         {
             ["controlId"] = controlId,
@@ -63,8 +71,10 @@ public sealed class PropertyTools
      Description("Get all binding errors captured since the application started. Binding errors are the #1 source of bugs in XAML apps — missing properties, wrong paths, null DataContexts. Returns error messages with timestamps.")]
     public static async Task<string> GetBindingErrors(
         AvaloniaConnection connection,
+        [Description("Process ID of the Avalonia app to connect to. If omitted, auto-discovers.")] int? pid = null,
         CancellationToken ct = default)
     {
+        if (pid.HasValue) connection.SwitchTo(pid.Value);
         return await connection.RequestAsync("get_binding_errors", ct: ct);
     }
 }

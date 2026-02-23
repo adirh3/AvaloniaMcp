@@ -12,8 +12,10 @@ public sealed class InspectionTools
      Description("List all open windows in the running Avalonia application. Returns title, size, state, and visibility for each window. Use this as the entry point to understand what's currently visible.")]
     public static async Task<string> ListWindows(
         AvaloniaConnection connection,
+        [Description("Process ID of the Avalonia app to connect to. Use discover_apps to find available PIDs. If omitted, auto-discovers (works when only one app is running).")] int? pid = null,
         CancellationToken ct = default)
     {
+        if (pid.HasValue) connection.SwitchTo(pid.Value);
         return await connection.RequestAsync("list_windows", ct: ct);
     }
 
@@ -24,8 +26,10 @@ public sealed class InspectionTools
         [Description("Index of the window (from list_windows). Default: 0 (main window).")] int windowIndex = 0,
         [Description("Control identifier: '#Name' to find by Name, or 'TypeName' / 'TypeName[index]' to find by type. If specified, shows the subtree rooted at this control.")] string? controlId = null,
         [Description("Maximum depth to traverse. Default: 10. Use lower values for large trees.")] int maxDepth = 10,
+        [Description("Process ID of the Avalonia app to connect to. If omitted, auto-discovers.")] int? pid = null,
         CancellationToken ct = default)
     {
+        if (pid.HasValue) connection.SwitchTo(pid.Value);
         return await connection.RequestAsync("get_visual_tree", new()
         {
             ["windowIndex"] = windowIndex,
@@ -41,8 +45,10 @@ public sealed class InspectionTools
         [Description("Index of the window (from list_windows). Default: 0.")] int windowIndex = 0,
         [Description("Control identifier to scope the tree. '#Name' or 'TypeName[index]'.")] string? controlId = null,
         [Description("Maximum depth. Default: 10.")] int maxDepth = 10,
+        [Description("Process ID of the Avalonia app to connect to. If omitted, auto-discovers.")] int? pid = null,
         CancellationToken ct = default)
     {
+        if (pid.HasValue) connection.SwitchTo(pid.Value);
         return await connection.RequestAsync("get_logical_tree", new()
         {
             ["windowIndex"] = windowIndex,
@@ -59,8 +65,10 @@ public sealed class InspectionTools
         [Description("Find controls whose type name contains this string (e.g. 'Button', 'TextBox').")] string? typeName = null,
         [Description("Find controls displaying this text content.")] string? text = null,
         [Description("Maximum results to return. Default: 20.")] int maxResults = 20,
+        [Description("Process ID of the Avalonia app to connect to. If omitted, auto-discovers.")] int? pid = null,
         CancellationToken ct = default)
     {
+        if (pid.HasValue) connection.SwitchTo(pid.Value);
         return await connection.RequestAsync("find_control", new()
         {
             ["name"] = name,
@@ -74,8 +82,10 @@ public sealed class InspectionTools
      Description("Get the currently focused element. Useful for debugging keyboard input and focus issues.")]
     public static async Task<string> GetFocusedElement(
         AvaloniaConnection connection,
+        [Description("Process ID of the Avalonia app to connect to. If omitted, auto-discovers.")] int? pid = null,
         CancellationToken ct = default)
     {
+        if (pid.HasValue) connection.SwitchTo(pid.Value);
         return await connection.RequestAsync("get_focused_element", ct: ct);
     }
 }

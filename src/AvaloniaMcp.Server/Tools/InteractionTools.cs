@@ -12,8 +12,10 @@ public sealed class InteractionTools
     public static async Task<string> ClickControl(
         AvaloniaConnection connection,
         [Description("Control identifier: '#Name' or 'TypeName[index]'.")] string controlId,
+        [Description("Process ID of the Avalonia app to connect to. If omitted, auto-discovers.")] int? pid = null,
         CancellationToken ct = default)
     {
+        if (pid.HasValue) connection.SwitchTo(pid.Value);
         return await connection.RequestAsync("click_control", new()
         {
             ["controlId"] = controlId,
@@ -27,8 +29,10 @@ public sealed class InteractionTools
         [Description("Control identifier.")] string controlId,
         [Description("Property name (e.g. 'IsVisible', 'Width', 'Margin', 'Content').")] string propertyName,
         [Description("Value as string. Will be converted to the property's type. For Thickness: '10' or '10,5' or '10,5,10,5'. For bool: 'true'/'false'. For enum: the enum name.")] string value,
+        [Description("Process ID of the Avalonia app to connect to. If omitted, auto-discovers.")] int? pid = null,
         CancellationToken ct = default)
     {
+        if (pid.HasValue) connection.SwitchTo(pid.Value);
         return await connection.RequestAsync("set_property", new()
         {
             ["controlId"] = controlId,
@@ -43,8 +47,10 @@ public sealed class InteractionTools
         AvaloniaConnection connection,
         [Description("Control identifier for the TextBox.")] string controlId,
         [Description("The text to enter.")] string text,
+        [Description("Process ID of the Avalonia app to connect to. If omitted, auto-discovers.")] int? pid = null,
         CancellationToken ct = default)
     {
+        if (pid.HasValue) connection.SwitchTo(pid.Value);
         return await connection.RequestAsync("input_text", new()
         {
             ["controlId"] = controlId,
@@ -58,8 +64,10 @@ public sealed class InteractionTools
         AvaloniaConnection connection,
         [Description("Index of the window to capture. Default: 0.")] int windowIndex = 0,
         [Description("Control identifier to capture a specific control instead of the whole window.")] string? controlId = null,
+        [Description("Process ID of the Avalonia app to connect to. If omitted, auto-discovers.")] int? pid = null,
         CancellationToken ct = default)
     {
+        if (pid.HasValue) connection.SwitchTo(pid.Value);
         return await connection.RequestAsync("take_screenshot", new()
         {
             ["windowIndex"] = windowIndex,

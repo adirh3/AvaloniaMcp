@@ -23,10 +23,25 @@ public sealed class AvaloniaConnection : IDisposable
     };
 
     public string? PipeName => _pipeName;
+    private readonly string? _fixedPipeName;
 
     public AvaloniaConnection(ConnectionOptions options)
     {
         _pipeName = options.PipeName;
+        _fixedPipeName = options.PipeName;
+    }
+
+    /// <summary>
+    /// Switch to a specific Avalonia app by PID. Disconnects from the current app if different.
+    /// </summary>
+    public void SwitchTo(int pid)
+    {
+        var newPipe = $"avalonia-mcp-{pid}";
+        if (_pipeName == newPipe && _pipe is { IsConnected: true })
+            return;
+
+        Disconnect();
+        _pipeName = newPipe;
     }
 
     public async Task<JsonDocument> SendAsync(string method, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
@@ -100,9 +115,11 @@ public sealed class AvaloniaConnection : IDisposable
 
     private string ResolvePipeName()
     {
+        // If a pipe was explicitly set (via --pipe, --pid, or SwitchTo), use it
         if (_pipeName is not null)
             return _pipeName;
 
+        // Auto-discover
         var apps = DiscoverApps();
         if (apps.Count == 1)
         {
@@ -115,7 +132,7 @@ public sealed class AvaloniaConnection : IDisposable
 
         if (apps.Count > 1)
             throw new InvalidOperationException(
-                $"Multiple Avalonia apps found ({apps.Count}). Use discover_apps to list them, then specify --pipe or --pid.");
+                $"Multiple Avalonia apps found ({apps.Count}). Call discover_apps first, then pass the pid parameter to target a specific app.");
 
         throw new InvalidOperationException(
             "No Avalonia apps with MCP diagnostics found. Start your Avalonia app with .UseMcpDiagnostics() first.");
