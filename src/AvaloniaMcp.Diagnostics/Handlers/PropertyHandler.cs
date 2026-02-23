@@ -17,6 +17,7 @@ internal static class PropertyHandler
         return await Dispatcher.UIThread.InvokeAsync(() =>
         {
             var controlId = req.GetString("controlId");
+            var propertyNames = req.GetStringArray("propertyNames");
             var control = ControlResolver.Resolve(controlId);
             if (control is null)
                 return DiagnosticResponse.Fail($"Control '{controlId}' not found");
@@ -28,6 +29,11 @@ internal static class PropertyHandler
 
             foreach (var prop in registeredProps)
             {
+                // Filter by property names if specified
+                if (propertyNames is not null &&
+                    !propertyNames.Any(n => prop.Name.Equals(n, StringComparison.OrdinalIgnoreCase)))
+                    continue;
+
                 try
                 {
                     var value = control.GetValue(prop);
@@ -43,6 +49,35 @@ internal static class PropertyHandler
                 catch
                 {
                     // Skip unreadable properties
+                }
+            }
+
+            // Also check CLR properties on the control type (not just AvaloniaProperties)
+            if (propertyNames is not null)
+            {
+                var controlType = control.GetType();
+                foreach (var name in propertyNames)
+                {
+                    if (props.Any(p => p!["name"]!.GetValue<string>().Equals(name, StringComparison.OrdinalIgnoreCase)))
+                        continue; // already found as AvaloniaProperty
+
+                    var clrProp = controlType.GetProperty(name, BindingFlags.Public | BindingFlags.Instance);
+                    if (clrProp is not null)
+                    {
+                        try
+                        {
+                            var value = clrProp.GetValue(control);
+                            props.Add(new JsonObject
+                            {
+                                ["name"] = J.Str(clrProp.Name),
+                                ["propertyType"] = J.Str(clrProp.PropertyType.Name),
+                                ["ownerType"] = J.Str(controlType.Name),
+                                ["value"] = J.Str(SafeSerialize(value)),
+                                ["isSet"] = J.Bool(true),
+                            });
+                        }
+                        catch { }
+                    }
                 }
             }
 
@@ -248,6 +283,112 @@ internal static class PropertyHandler
                 ["resourceCount"] = J.Int(resources.Count),
                 ["resources"] = resources,
             });
+        });
+    }
+
+    public static async Task<DiagnosticResponse> WaitForProperty(DiagnosticRequest req)
+    {
+        var controlId = req.GetString("controlId");
+        var propertyName = req.GetString("propertyName");
+        var expectedValue = req.GetString("expectedValue");
+        var timeoutMs = req.GetInt("timeoutMs", 30000);
+        var pollIntervalMs = req.GetInt("pollIntervalMs", 500);
+
+        if (string.IsNullOrEmpty(propertyName))
+            return DiagnosticResponse.Fail("propertyName is required");
+
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+
+        while (sw.ElapsedMilliseconds < timeoutMs)
+        {
+            var currentValue = await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                var control = ControlResolver.Resolve(controlId)
+                    ?? ControlResolver.GetMainWindow();
+                if (control is null) return (found: false, value: (string?)null, error: "Control not found");
+
+                // Check AvaloniaProperty first
+                var props = AvaloniaPropertyRegistry.Instance.GetRegistered(control)
+                    .Concat(AvaloniaPropertyRegistry.Instance.GetRegisteredAttached(control.GetType()));
+                var prop = props.FirstOrDefault(p => p.Name.Equals(propertyName, StringComparison.OrdinalIgnoreCase));
+                if (prop is not null)
+                {
+                    var val = SafeSerialize(control.GetValue(prop));
+                    return (found: true, value: val, error: (string?)null);
+                }
+
+                // Check CLR property
+                var clrProp = control.GetType().GetProperty(propertyName, BindingFlags.Public | BindingFlags.Instance);
+                if (clrProp is not null)
+                {
+                    var val = SafeSerialize(clrProp.GetValue(control));
+                    return (found: true, value: val, error: (string?)null);
+                }
+
+                // Check DataContext property
+                var dc = control.DataContext;
+                if (dc is not null)
+                {
+                    var dcProp = dc.GetType().GetProperty(propertyName, BindingFlags.Public | BindingFlags.Instance);
+                    if (dcProp is not null)
+                    {
+                        var val = SafeSerialize(dcProp.GetValue(dc));
+                        return (found: true, value: val, error: (string?)null);
+                    }
+                }
+
+                return (found: false, value: (string?)null, error: $"Property '{propertyName}' not found on control or its DataContext");
+            });
+
+            if (!currentValue.found)
+                return DiagnosticResponse.Fail(currentValue.error!);
+
+            var matches = string.IsNullOrEmpty(expectedValue)
+                ? true
+                : string.Equals(currentValue.value, expectedValue, StringComparison.OrdinalIgnoreCase);
+
+            if (matches)
+            {
+                return DiagnosticResponse.Ok(new JsonObject
+                {
+                    ["matched"] = J.Bool(true),
+                    ["property"] = J.Str(propertyName),
+                    ["value"] = J.Str(currentValue.value),
+                    ["elapsedMs"] = J.Int((int)sw.ElapsedMilliseconds),
+                });
+            }
+
+            await Task.Delay(pollIntervalMs);
+        }
+
+        // Timeout — return last value
+        var finalValue = await Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            var control = ControlResolver.Resolve(controlId) ?? ControlResolver.GetMainWindow();
+            if (control is null) return "<control not found>";
+            var props = AvaloniaPropertyRegistry.Instance.GetRegistered(control)
+                .Concat(AvaloniaPropertyRegistry.Instance.GetRegisteredAttached(control.GetType()));
+            var prop = props.FirstOrDefault(p => p.Name.Equals(propertyName, StringComparison.OrdinalIgnoreCase));
+            if (prop is not null) return SafeSerialize(control.GetValue(prop));
+            var clrProp = control.GetType().GetProperty(propertyName, BindingFlags.Public | BindingFlags.Instance);
+            if (clrProp is not null) return SafeSerialize(clrProp.GetValue(control));
+            var dc = control.DataContext;
+            if (dc is not null)
+            {
+                var dcProp = dc.GetType().GetProperty(propertyName, BindingFlags.Public | BindingFlags.Instance);
+                if (dcProp is not null) return SafeSerialize(dcProp.GetValue(dc));
+            }
+            return "<not found>";
+        });
+
+        return DiagnosticResponse.Ok(new JsonObject
+        {
+            ["matched"] = J.Bool(false),
+            ["property"] = J.Str(propertyName),
+            ["value"] = J.Str(finalValue),
+            ["expectedValue"] = J.Str(expectedValue),
+            ["timedOut"] = J.Bool(true),
+            ["elapsedMs"] = J.Int((int)sw.ElapsedMilliseconds),
         });
     }
 

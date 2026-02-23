@@ -83,39 +83,63 @@ internal static class InteractionHandler
         {
             var controlId = req.GetString("controlId");
             var text = req.GetString("text") ?? "";
+            var pressEnter = req.GetBool("pressEnter");
 
             var control = ControlResolver.Resolve(controlId);
             if (control is null)
                 return DiagnosticResponse.Fail($"Control '{controlId}' not found");
 
-            if (control is TextBox textBox)
-            {
-                textBox.Text = text;
-                return DiagnosticResponse.Ok(new JsonObject { ["typed"] = J.Bool(true), ["controlType"] = J.Str("TextBox"), ["text"] = J.Str(text) });
-            }
+            // Find the target TextBox (directly or as a child)
+            TextBox? targetTextBox = control as TextBox;
+            string? resolvedFrom = null;
 
-            if (control is AutoCompleteBox acb)
+            if (targetTextBox is null && control is AutoCompleteBox acb)
             {
                 acb.Text = text;
-                return DiagnosticResponse.Ok(new JsonObject { ["typed"] = J.Bool(true), ["controlType"] = J.Str("AutoCompleteBox"), ["text"] = J.Str(text) });
+                if (pressEnter)
+                    RaiseEnterKey(acb);
+                return DiagnosticResponse.Ok(new JsonObject { ["typed"] = J.Bool(true), ["controlType"] = J.Str("AutoCompleteBox"), ["text"] = J.Str(text), ["pressedEnter"] = J.Bool(pressEnter) });
             }
 
-            // Auto-find the first TextBox child inside composite controls
-            var childTextBox = control.GetVisualDescendants().OfType<TextBox>().FirstOrDefault();
-            if (childTextBox is not null)
+            if (targetTextBox is null)
             {
-                childTextBox.Text = text;
-                return DiagnosticResponse.Ok(new JsonObject
-                {
-                    ["typed"] = J.Bool(true),
-                    ["controlType"] = J.Str(control.GetType().Name),
-                    ["resolvedTo"] = J.Str(childTextBox.Name ?? childTextBox.GetType().Name),
-                    ["text"] = J.Str(text),
-                });
+                // Auto-find the first TextBox child inside composite controls
+                targetTextBox = control.GetVisualDescendants().OfType<TextBox>().FirstOrDefault();
+                if (targetTextBox is not null)
+                    resolvedFrom = control.GetType().Name;
             }
 
-            return DiagnosticResponse.Fail($"Control type {control.GetType().Name} does not contain a TextBox. Use a TextBox or similar.");
+            if (targetTextBox is null)
+                return DiagnosticResponse.Fail($"Control type {control.GetType().Name} does not contain a TextBox.");
+
+            targetTextBox.Text = text;
+
+            if (pressEnter)
+                RaiseEnterKey(targetTextBox);
+
+            var result = new JsonObject
+            {
+                ["typed"] = J.Bool(true),
+                ["controlType"] = J.Str(targetTextBox.GetType().Name),
+                ["text"] = J.Str(text),
+                ["pressedEnter"] = J.Bool(pressEnter),
+            };
+            if (resolvedFrom is not null)
+                result["resolvedFrom"] = J.Str(resolvedFrom);
+            if (!string.IsNullOrEmpty(targetTextBox.Name))
+                result["resolvedTo"] = J.Str(targetTextBox.Name);
+            return DiagnosticResponse.Ok(result);
         });
+    }
+
+    private static void RaiseEnterKey(Control control)
+    {
+        var keyDown = new KeyEventArgs
+        {
+            RoutedEvent = InputElement.KeyDownEvent,
+            Key = Key.Enter,
+        };
+        control.RaiseEvent(keyDown);
     }
 
     public static async Task<DiagnosticResponse> InvokeCommand(DiagnosticRequest req)

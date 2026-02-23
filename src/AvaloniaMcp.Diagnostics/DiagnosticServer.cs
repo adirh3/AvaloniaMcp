@@ -222,6 +222,7 @@ public sealed class DiagnosticServer : IDisposable
             "input_text" => await InteractionHandler.InputText(request),
             "invoke_command" => await InteractionHandler.InvokeCommand(request),
             "take_screenshot" => await InteractionHandler.TakeScreenshot(request),
+            "wait_for_property" => await PropertyHandler.WaitForProperty(request),
             "ping" => DiagnosticResponse.Ok(new JsonObject { ["status"] = J.Str("ok"), ["pid"] = J.Int(Environment.ProcessId), ["protocolVersion"] = J.Str(ProtocolVersion) }),
             _ => DiagnosticResponse.Fail($"Unknown method: {request.Method}"),
         };

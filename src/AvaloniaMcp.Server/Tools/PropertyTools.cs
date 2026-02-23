@@ -8,18 +8,22 @@ namespace AvaloniaMcp.Server.Tools;
 public sealed class PropertyTools
 {
     [McpServerTool(Name = "get_control_properties", ReadOnly = true, Destructive = false),
-     Description("Get all Avalonia properties of a control, including current values, property types, whether they are set explicitly, and binding information. Essential for debugging why a control looks or behaves unexpectedly.")]
+     Description("Get Avalonia properties of a control. By default returns ALL properties (can be large). Use propertyNames to filter to specific properties for much smaller responses. Also reads CLR properties when filtered.")]
     public static async Task<string> GetControlProperties(
         AvaloniaConnection connection,
         [Description("Control identifier: '#Name' to find by Name, or 'TypeName[index]' to find by type.")] string controlId,
+        [Description("Optional list of property names to return (e.g. ['Markdown', 'Text', 'IsVisible']). If omitted, returns all properties.")] string[]? propertyNames = null,
         [Description("Process ID of the Avalonia app to connect to. If omitted, auto-discovers.")] int? pid = null,
         CancellationToken ct = default)
     {
         if (pid.HasValue) connection.SwitchTo(pid.Value);
-        return await connection.RequestAsync("get_control_properties", new()
+        var p = new Dictionary<string, object?>
         {
             ["controlId"] = controlId,
-        }, ct);
+        };
+        if (propertyNames is { Length: > 0 })
+            p["propertyNames"] = propertyNames;
+        return await connection.RequestAsync("get_control_properties", p, ct);
     }
 
     [McpServerTool(Name = "get_data_context", ReadOnly = true, Destructive = false),
@@ -68,6 +72,29 @@ public sealed class PropertyTools
         return await connection.RequestAsync("get_resources", new()
         {
             ["controlId"] = controlId,
+        }, ct);
+    }
+
+    [McpServerTool(Name = "wait_for_property", ReadOnly = true, Destructive = false),
+     Description("Wait until a property on a control (or its DataContext) reaches an expected value, with timeout. Polls periodically. Use this to wait for async operations to complete (e.g. wait for IsStreaming == false).")]
+    public static async Task<string> WaitForProperty(
+        AvaloniaConnection connection,
+        [Description("Control identifier. If omitted, uses main window.")] string? controlId = null,
+        [Description("Property name to watch. Checks AvaloniaProperties, CLR properties, then DataContext properties.")] string propertyName = "",
+        [Description("Expected value as string (case-insensitive comparison). e.g. 'false', 'Idle', '0'.")] string expectedValue = "",
+        [Description("Timeout in milliseconds. Default: 30000 (30 seconds).")] int timeoutMs = 30000,
+        [Description("Poll interval in milliseconds. Default: 500.")] int pollIntervalMs = 500,
+        [Description("Process ID of the Avalonia app to connect to. If omitted, auto-discovers.")] int? pid = null,
+        CancellationToken ct = default)
+    {
+        if (pid.HasValue) connection.SwitchTo(pid.Value);
+        return await connection.RequestAsync("wait_for_property", new()
+        {
+            ["controlId"] = controlId,
+            ["propertyName"] = propertyName,
+            ["expectedValue"] = expectedValue,
+            ["timeoutMs"] = timeoutMs,
+            ["pollIntervalMs"] = pollIntervalMs,
         }, ct);
     }
 

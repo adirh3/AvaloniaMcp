@@ -42,11 +42,12 @@ public sealed class InteractionTools
     }
 
     [McpServerTool(Name = "input_text", ReadOnly = false, Destructive = false),
-     Description("Type text into a TextBox or similar input control. If the target control is not a TextBox (e.g. a composite UserControl), automatically finds the first TextBox child inside it.")]
+     Description("Type text into a TextBox or similar input control. If the target control is not a TextBox (e.g. a composite UserControl), automatically finds the first TextBox child inside it. Use pressEnter to simulate pressing Enter after typing (e.g. to submit a chat message).")]
     public static async Task<string> InputText(
         AvaloniaConnection connection,
         [Description("Control identifier for the TextBox or a parent control containing a TextBox.")] string controlId,
         [Description("The text to enter.")] string text,
+        [Description("If true, simulates pressing Enter after typing. Useful for submitting forms or sending messages.")] bool pressEnter = false,
         [Description("Process ID of the Avalonia app to connect to. If omitted, auto-discovers.")] int? pid = null,
         CancellationToken ct = default)
     {
@@ -55,6 +56,7 @@ public sealed class InteractionTools
         {
             ["controlId"] = controlId,
             ["text"] = text,
+            ["pressEnter"] = pressEnter,
         }, ct);
     }
 

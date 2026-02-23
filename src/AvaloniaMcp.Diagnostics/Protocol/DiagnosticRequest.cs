@@ -41,6 +41,21 @@ public sealed class DiagnosticRequest
         }
         return defaultValue;
     }
+
+    public List<string>? GetStringArray(string key)
+    {
+        if (Params.TryGetPropertyValue(key, out var node) && node is JsonArray arr)
+        {
+            var list = new List<string>();
+            foreach (var item in arr)
+            {
+                if (item is not null)
+                    list.Add(item.GetValue<string>());
+            }
+            return list.Count > 0 ? list : null;
+        }
+        return null;
+    }
 }
 
 [JsonSerializable(typeof(DiagnosticRequest))]
