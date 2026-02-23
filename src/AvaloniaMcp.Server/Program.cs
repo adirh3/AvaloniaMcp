@@ -11,6 +11,31 @@ if (args.Length > 0 && args[0] is "--version" or "-v" or "version")
     return;
 }
 
+// Handle help flag
+if (args.Length > 0 && args[0] is "--help" or "-h" or "help")
+{
+    Console.WriteLine("""
+    AvaloniaMcp — MCP server for debugging Avalonia UI applications (v0.2.0)
+
+    Usage:
+      avalonia-mcp                     Start as MCP server (stdio transport, for AI agents)
+      avalonia-mcp cli <method> ...    Run a single diagnostic command (see 'avalonia-mcp cli --help')
+      avalonia-mcp --version           Show version
+      avalonia-mcp --help              Show this help
+
+    MCP Server Options:
+      --pipe <name>      Connect to a specific named pipe
+      --pid <processId>  Connect to an Avalonia app by PID (derives pipe name)
+
+    If no --pipe or --pid is given, the server auto-discovers running Avalonia apps
+    when tools are invoked. Logs are written to stderr.
+
+    Compatible with AvaloniaMcp.Diagnostics v0.2.0. The in-app library must match
+    or be updated to avoid protocol mismatches.
+    """);
+    return;
+}
+
 // Check for CLI mode: avalonia-mcp cli <method> [--param value ...]
 if (args.Length > 0 && args[0] == "cli")
 {
@@ -148,38 +173,38 @@ static async Task RunCliAsync(string[] args)
 static void PrintCliHelp()
 {
     Console.WriteLine("""
-        AvaloniaMcp CLI — Debug running Avalonia applications
+    AvaloniaMcp CLI — Debug running Avalonia applications
 
-        Usage: avalonia-mcp cli <method> [--param value ...] [--pipe name | --pid processId]
+    Usage: avalonia-mcp cli <method> [--param value ...] [--pipe name | --pid processId]
 
-        Methods:
-          list_windows                           List all open windows
-          get_visual_tree    [--maxDepth 10]      Get visual tree of a window
-          get_logical_tree   [--maxDepth 10]      Get logical tree of a window
-          find_control       [--name X] [--typeName Y] [--text Z]
-          get_control_properties --controlId X    Get all properties of a control
-          get_data_context   [--controlId X]      Get ViewModel/DataContext
-          get_binding_errors                      Get all binding errors
-          get_applied_styles --controlId X        Get styles on a control
-          get_resources      [--controlId X]      Get resource dictionary
-          get_focused_element                     Get focused element
-          take_screenshot    [--controlId X]      Capture screenshot (base64 PNG)
-          click_control      --controlId X        Simulate click
-          set_property       --controlId X --propertyName Y --value Z
-          input_text         --controlId X --text Y
+    Methods:
+      list_windows                           List all open windows
+      get_visual_tree    [--maxDepth 10]      Get visual tree of a window
+      get_logical_tree   [--maxDepth 10]      Get logical tree of a window
+      find_control       [--name X] [--typeName Y] [--text Z]
+      get_control_properties --controlId X    Get all properties of a control
+      get_data_context   [--controlId X]      Get ViewModel/DataContext
+      get_binding_errors                      Get all binding errors
+      get_applied_styles --controlId X        Get styles on a control
+      get_resources      [--controlId X]      Get resource dictionary
+      get_focused_element                     Get focused element
+      take_screenshot    [--controlId X]      Capture screenshot (base64 PNG)
+      click_control      --controlId X        Simulate click
+      set_property       --controlId X --propertyName Y --value Z
+      input_text         --controlId X --text Y
 
-        Connection:
-          --pipe <name>      Named pipe to connect to (e.g. 'avalonia-mcp-12345')
-          --pid <processId>  Process ID (derives pipe name automatically)
-          (If omitted, auto-discovers a single running app)
+    Connection:
+      --pipe <name>      Named pipe to connect to (e.g. 'avalonia-mcp-12345')
+      --pid <processId>  Process ID (derives pipe name automatically)
+      (If omitted, auto-discovers a single running app)
 
-        Examples:
-          avalonia-mcp cli list_windows
-          avalonia-mcp cli get_visual_tree --maxDepth 5
-          avalonia-mcp cli find_control --typeName Button
-          avalonia-mcp cli get_control_properties --controlId "#MyButton"
-          avalonia-mcp cli take_screenshot --controlId "#MainGrid"
-        """);
+    Examples:
+      avalonia-mcp cli list_windows
+      avalonia-mcp cli get_visual_tree --maxDepth 5
+      avalonia-mcp cli find_control --typeName Button
+      avalonia-mcp cli get_control_properties --controlId "#MyButton"
+      avalonia-mcp cli take_screenshot --controlId "#MainGrid"
+    """);
 }
 
 static string? GetArg(string[] args, string name)

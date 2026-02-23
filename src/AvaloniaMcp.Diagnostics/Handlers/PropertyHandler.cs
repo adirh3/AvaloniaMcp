@@ -33,11 +33,11 @@ internal static class PropertyHandler
                     var value = control.GetValue(prop);
                     props.Add(new JsonObject
                     {
-                        ["name"] = prop.Name,
-                        ["propertyType"] = prop.PropertyType.Name,
-                        ["ownerType"] = prop.OwnerType.Name,
-                        ["value"] = SafeSerialize(value),
-                        ["isSet"] = control.IsSet(prop),
+                        ["name"] = J.Str(prop.Name),
+                        ["propertyType"] = J.Str(prop.PropertyType.Name),
+                        ["ownerType"] = J.Str(prop.OwnerType.Name),
+                        ["value"] = J.Str(SafeSerialize(value)),
+                        ["isSet"] = J.Bool(control.IsSet(prop)),
                     });
                 }
                 catch
@@ -48,9 +48,9 @@ internal static class PropertyHandler
 
             var result = new JsonObject
             {
-                ["type"] = control.GetType().FullName,
-                ["name"] = control.Name,
-                ["propertyCount"] = props.Count,
+                ["type"] = J.Str(control.GetType().FullName),
+                ["name"] = J.Str(control.Name),
+                ["propertyCount"] = J.Int(props.Count),
                 ["properties"] = props,
             };
 
@@ -70,13 +70,13 @@ internal static class PropertyHandler
 
             var dc = control.DataContext;
             if (dc is null)
-                return DiagnosticResponse.Ok(new JsonObject { ["message"] = "DataContext is null", ["controlType"] = control.GetType().Name });
+                return DiagnosticResponse.Ok(new JsonObject { ["message"] = J.Str("DataContext is null"), ["controlType"] = J.Str(control.GetType().Name) });
 
             var result = new JsonObject
             {
-                ["controlType"] = control.GetType().Name,
-                ["controlName"] = control.Name,
-                ["dataContextType"] = dc.GetType().FullName,
+                ["controlType"] = J.Str(control.GetType().Name),
+                ["controlName"] = J.Str(control.Name),
+                ["dataContextType"] = J.Str(dc.GetType().FullName),
                 ["properties"] = SerializeObject(dc),
             };
 
@@ -95,16 +95,16 @@ internal static class PropertyHandler
 
             var classesArr = new JsonArray();
             foreach (var cls in control.Classes)
-                classesArr.Add(cls);
+                classesArr.Add(J.Str(cls));
 
             var pseudoArr = new JsonArray();
             foreach (var cls in control.Classes.Where(c => c.StartsWith(':')))
-                pseudoArr.Add(cls);
+                pseudoArr.Add(J.Str(cls));
 
             var result = new JsonObject
             {
-                ["type"] = control.GetType().Name,
-                ["name"] = control.Name,
+                ["type"] = J.Str(control.GetType().Name),
+                ["name"] = J.Str(control.Name),
                 ["classes"] = classesArr,
                 ["pseudoClasses"] = pseudoArr,
             };
@@ -122,14 +122,14 @@ internal static class PropertyHandler
                         {
                             if (setter is Setter avSetter)
                             {
-                                setters.Add((JsonNode)$"{avSetter.Property?.Name} = {SafeSerialize(avSetter.Value)}");
+                                setters.Add(J.Str($"{avSetter.Property?.Name} = {SafeSerialize(avSetter.Value)}"));
                             }
                         }
 
                         appliedStyles.Add(new JsonObject
                         {
-                            ["selector"] = s.Selector?.ToString(),
-                            ["setterCount"] = s.Setters.Count,
+                            ["selector"] = J.Str(s.Selector?.ToString()),
+                            ["setterCount"] = J.Int(s.Setters.Count),
                             ["setters"] = setters,
                         });
                     }
@@ -165,9 +165,9 @@ internal static class PropertyHandler
                 {
                     resources.Add(new JsonObject
                     {
-                        ["key"] = kvp.Key?.ToString(),
-                        ["valueType"] = kvp.Value?.GetType().Name,
-                        ["value"] = SafeSerialize(kvp.Value),
+                        ["key"] = J.Str(kvp.Key?.ToString()),
+                        ["valueType"] = J.Str(kvp.Value?.GetType().Name),
+                        ["value"] = J.Str(SafeSerialize(kvp.Value)),
                     });
                 }
 
@@ -179,10 +179,10 @@ internal static class PropertyHandler
                         {
                             resources.Add(new JsonObject
                             {
-                                ["key"] = kvp.Key?.ToString(),
-                                ["valueType"] = kvp.Value?.GetType().Name,
-                                ["value"] = SafeSerialize(kvp.Value),
-                                ["source"] = "merged",
+                                ["key"] = J.Str(kvp.Key?.ToString()),
+                                ["valueType"] = J.Str(kvp.Value?.GetType().Name),
+                                ["value"] = J.Str(SafeSerialize(kvp.Value)),
+                                ["source"] = J.Str("merged"),
                             });
                         }
                     }
@@ -191,8 +191,8 @@ internal static class PropertyHandler
 
             return DiagnosticResponse.Ok(new JsonObject
             {
-                ["controlType"] = control?.GetType().Name ?? "Application",
-                ["resourceCount"] = resources.Count,
+                ["controlType"] = J.Str(control?.GetType().Name ?? "Application"),
+                ["resourceCount"] = J.Int(resources.Count),
                 ["resources"] = resources,
             });
         });
@@ -209,7 +209,7 @@ internal static class PropertyHandler
 
             return DiagnosticResponse.Ok(new JsonObject
             {
-                ["errorCount"] = errors.Count,
+                ["errorCount"] = J.Int(errors.Count),
                 ["errors"] = errorsArr,
             });
         });
@@ -245,11 +245,11 @@ internal static class PropertyHandler
             try
             {
                 var value = prop.GetValue(obj);
-                dict[prop.Name] = SafeSerialize(value);
+                dict[prop.Name] = J.Str(SafeSerialize(value));
             }
             catch
             {
-                dict[prop.Name] = "<error reading>";
+                dict[prop.Name] = J.Str("<error reading>");
             }
         }
         return dict;

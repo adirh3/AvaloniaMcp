@@ -16,14 +16,32 @@ public sealed class DiagnosticServer : IDisposable
     private readonly string _pipeName;
     private CancellationTokenSource? _cts;
     private Task? _serverTask;
-    private static readonly JsonSerializerOptions JsonOptions = new()
+    private static readonly JsonSerializerOptions JsonOptions;
+
+    static DiagnosticServer()
     {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        WriteIndented = false,
-        NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals,
-        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
-        TypeInfoResolver = DiagnosticJsonContext.Default,
-    };
+        JsonOptions = new()
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            WriteIndented = false,
+            NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals,
+            Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+            TypeInfoResolver = DiagnosticJsonContext.Default,
+        };
+
+        // In apps with PublishAot=true, JsonSerializerOptions.Default uses EmptyJsonTypeInfoResolver.
+        // JsonValue<T> created via implicit conversion (e.g. jsonObj["key"] = "value") stores
+        // Default options internally and ignores options passed to WriteTo/Serialize.
+        // Fix: add our resolver to Default's chain so basic types can be serialized.
+        try
+        {
+            JsonSerializerOptions.Default.TypeInfoResolverChain.Add(DiagnosticJsonContext.Default);
+        }
+        catch
+        {
+            // Already locked or not supported — ignore
+        }
+    }
 
     public string PipeName => _pipeName;
 
@@ -139,7 +157,15 @@ public sealed class DiagnosticServer : IDisposable
                 string responseJson;
                 try
                 {
-                    responseJson = JsonSerializer.Serialize(response, JsonOptions);
+                    // Serialize manually via JsonNode to avoid source-generator limitations
+                    // with deeply nested JsonValue<T> instances in AOT-aware apps.
+                    var responseNode = new JsonObject
+                    {
+                        ["success"] = J.Bool(response.Success),
+                        ["data"] = response.Data?.DeepClone(),
+                        ["error"] = J.Str(response.Error),
+                    };
+                    responseJson = responseNode.ToJsonString(JsonOptions);
                 }
                 catch (Exception serEx)
                 {
@@ -195,10 +221,16 @@ public sealed class DiagnosticServer : IDisposable
             "set_property" => await InteractionHandler.SetProperty(request),
             "input_text" => await InteractionHandler.InputText(request),
             "take_screenshot" => await InteractionHandler.TakeScreenshot(request),
-            "ping" => DiagnosticResponse.Ok(new JsonObject { ["status"] = "ok", ["pid"] = Environment.ProcessId }),
+            "ping" => DiagnosticResponse.Ok(new JsonObject { ["status"] = J.Str("ok"), ["pid"] = J.Int(Environment.ProcessId), ["protocolVersion"] = J.Str(ProtocolVersion) }),
             _ => DiagnosticResponse.Fail($"Unknown method: {request.Method}"),
         };
     }
+
+    /// <summary>
+    /// Protocol version for client-server compatibility checks.
+    /// Bump this when the request/response format changes.
+    /// </summary>
+    public const string ProtocolVersion = "0.2.0";
 
     private void WriteDiscoveryFile()
     {
@@ -209,10 +241,12 @@ public sealed class DiagnosticServer : IDisposable
             var path = Path.Combine(dir, $"{Environment.ProcessId}.json");
             var info = new JsonObject
             {
-                ["pid"] = Environment.ProcessId,
-                ["pipeName"] = _pipeName,
-                ["processName"] = Process.GetCurrentProcess().ProcessName,
-                ["startTime"] = DateTime.UtcNow.ToString("O"),
+                ["pid"] = J.Int(Environment.ProcessId),
+                ["pipeName"] = J.Str(_pipeName),
+                ["processName"] = J.Str(Process.GetCurrentProcess().ProcessName),
+                ["startTime"] = J.Str(DateTime.UtcNow.ToString("O")),
+                ["protocolVersion"] = J.Str(ProtocolVersion),
+                ["diagnosticsVersion"] = J.Str(typeof(DiagnosticServer).Assembly.GetName().Version?.ToString() ?? ProtocolVersion),
             };
             var json = info.ToJsonString();
             File.WriteAllText(path, json);

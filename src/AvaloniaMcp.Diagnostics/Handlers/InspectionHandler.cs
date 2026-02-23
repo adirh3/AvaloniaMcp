@@ -20,17 +20,17 @@ internal static class InspectionHandler
                 var w = windows[i];
                 result.Add(new JsonObject
                 {
-                    ["index"] = i,
-                    ["title"] = w.Title,
-                    ["type"] = w.GetType().Name,
-                    ["width"] = w.Width,
-                    ["height"] = w.Height,
-                    ["clientWidth"] = w.ClientSize.Width,
-                    ["clientHeight"] = w.ClientSize.Height,
-                    ["isActive"] = w.IsActive,
-                    ["isVisible"] = w.IsVisible,
-                    ["windowState"] = w.WindowState.ToString(),
-                    ["position"] = w.Position.ToString(),
+                    ["index"] = J.Int(i),
+                    ["title"] = J.Str(w.Title),
+                    ["type"] = J.Str(w.GetType().Name),
+                    ["width"] = J.Dbl(w.Width),
+                    ["height"] = J.Dbl(w.Height),
+                    ["clientWidth"] = J.Dbl(w.ClientSize.Width),
+                    ["clientHeight"] = J.Dbl(w.ClientSize.Height),
+                    ["isActive"] = J.Bool(w.IsActive),
+                    ["isVisible"] = J.Bool(w.IsVisible),
+                    ["windowState"] = J.Str(w.WindowState.ToString()),
+                    ["position"] = J.Str(w.Position.ToString()),
                 });
             }
 
@@ -147,11 +147,11 @@ internal static class InspectionHandler
                 if (focused is Visual v)
                 {
                     var node = ControlResolver.SerializeNode(v, maxDepth: 0);
-                    node["windowTitle"] = w.Title;
+                    node["windowTitle"] = J.Str(w.Title);
                     return DiagnosticResponse.Ok(node);
                 }
             }
-            return DiagnosticResponse.Ok(new JsonObject { ["message"] = "No element is focused" });
+            return DiagnosticResponse.Ok(new JsonObject { ["message"] = J.Str("No element is focused") });
         });
     }
 }

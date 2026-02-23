@@ -48,6 +48,13 @@ public sealed class DiagnosticRequest
 [JsonSerializable(typeof(JsonNode))]
 [JsonSerializable(typeof(JsonObject))]
 [JsonSerializable(typeof(JsonArray))]
+[JsonSerializable(typeof(JsonValue))]
+[JsonSerializable(typeof(string))]
+[JsonSerializable(typeof(bool))]
+[JsonSerializable(typeof(int))]
+[JsonSerializable(typeof(double))]
+[JsonSerializable(typeof(float))]
+[JsonSerializable(typeof(long))]
 internal partial class DiagnosticJsonContext : JsonSerializerContext
 {
 }

@@ -4,6 +4,7 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.LogicalTree;
 using Avalonia.VisualTree;
 using System.Text.Json.Nodes;
+using AvaloniaMcp.Diagnostics.Protocol;
 
 namespace AvaloniaMcp.Diagnostics.Handlers;
 
@@ -99,57 +100,84 @@ internal static class ControlResolver
     {
         var node = new JsonObject
         {
-            ["type"] = visual.GetType().Name,
+            ["type"] = J.Str(visual.GetType().Name),
         };
 
-        if (visual is Control c)
+        try
         {
-            if (!string.IsNullOrEmpty(c.Name))
-                node["name"] = c.Name;
-            node["isVisible"] = c.IsVisible;
-            node["isEnabled"] = c.IsEnabled;
+            if (visual is Control c)
+            {
+                if (!string.IsNullOrEmpty(c.Name))
+                    node["name"] = J.Str(c.Name);
+                node["isVisible"] = J.Bool(c.IsVisible);
+                node["isEnabled"] = J.Bool(c.IsEnabled);
+            }
+
+            node["bounds"] = new JsonObject
+            {
+                ["x"] = J.Dbl(visual.Bounds.X),
+                ["y"] = J.Dbl(visual.Bounds.Y),
+                ["width"] = J.Dbl(visual.Bounds.Width),
+                ["height"] = J.Dbl(visual.Bounds.Height),
+            };
+
+            if (visual is ContentControl cc && cc.Content is string text)
+                node["content"] = J.Str(text);
+            else if (visual is TextBlock tb)
+                node["text"] = J.Str(tb.Text);
+
+            if (visual.Classes.Count > 0)
+            {
+                var arr = new JsonArray();
+                foreach (var cls in visual.Classes)
+                    arr.Add(J.Str(cls));
+                node["classes"] = arr;
+            }
+
+            if (visual.GetValue(Visual.OpacityProperty) is double op && Math.Abs(op - 1.0) > 0.01)
+                node["opacity"] = J.Dbl(op);
         }
-
-        node["bounds"] = new JsonObject
+        catch (Exception ex)
         {
-            ["x"] = visual.Bounds.X,
-            ["y"] = visual.Bounds.Y,
-            ["width"] = visual.Bounds.Width,
-            ["height"] = visual.Bounds.Height,
-        };
-
-        if (visual is ContentControl cc && cc.Content is string text)
-            node["content"] = text;
-        else if (visual is TextBlock tb)
-            node["text"] = tb.Text;
-
-        if (visual.Classes.Count > 0)
-        {
-            var arr = new JsonArray();
-            foreach (var cls in visual.Classes)
-                arr.Add(cls);
-            node["classes"] = arr;
+            node["_error"] = J.Str($"Failed to read properties: {ex.GetType().Name}: {ex.Message}");
         }
-
-        if (visual.GetValue(Visual.OpacityProperty) is double op && Math.Abs(op - 1.0) > 0.01)
-            node["opacity"] = op;
 
         if (currentDepth < maxDepth)
         {
-            var children = visual.GetVisualChildren().ToList();
-            if (children.Count > 0)
+            try
             {
-                var arr = new JsonArray();
-                foreach (var child in children)
-                    arr.Add(SerializeNode(child, maxDepth, currentDepth + 1));
-                node["children"] = arr;
+                var children = visual.GetVisualChildren().ToList();
+                if (children.Count > 0)
+                {
+                    var arr = new JsonArray();
+                    foreach (var child in children)
+                    {
+                        try
+                        {
+                            arr.Add(SerializeNode(child, maxDepth, currentDepth + 1));
+                        }
+                        catch (Exception ex)
+                        {
+                            arr.Add(new JsonObject
+                            {
+                                ["type"] = J.Str(child.GetType().Name),
+                                ["_error"] = J.Str($"{ex.GetType().Name}: {ex.Message}"),
+                            });
+                        }
+                    }
+                    node["children"] = arr;
+                }
+            }
+            catch (Exception ex)
+            {
+                node["_childrenError"] = J.Str($"{ex.GetType().Name}: {ex.Message}");
             }
         }
         else
         {
             var childCount = visual.GetVisualChildren().Count();
             if (childCount > 0)
-                node["childCount"] = childCount;
+                node["childCount"] = J.Int(childCount);
         }
 
         return node;
@@ -162,37 +190,64 @@ internal static class ControlResolver
     {
         var node = new JsonObject
         {
-            ["type"] = logical.GetType().Name,
+            ["type"] = J.Str(logical.GetType().Name),
         };
 
-        if (logical is Control c)
+        try
         {
-            if (!string.IsNullOrEmpty(c.Name))
-                node["name"] = c.Name;
-            node["isVisible"] = c.IsVisible;
-        }
+            if (logical is Control c)
+            {
+                if (!string.IsNullOrEmpty(c.Name))
+                    node["name"] = J.Str(c.Name);
+                node["isVisible"] = J.Bool(c.IsVisible);
+            }
 
-        if (logical is ContentControl cc && cc.Content is string text)
-            node["content"] = text;
-        else if (logical is TextBlock tb)
-            node["text"] = tb.Text;
+            if (logical is ContentControl cc && cc.Content is string text)
+                node["content"] = J.Str(text);
+            else if (logical is TextBlock tb)
+                node["text"] = J.Str(tb.Text);
+        }
+        catch (Exception ex)
+        {
+            node["_error"] = J.Str($"Failed to read properties: {ex.GetType().Name}: {ex.Message}");
+        }
 
         if (currentDepth < maxDepth)
         {
-            var children = logical.GetLogicalChildren().ToList();
-            if (children.Count > 0)
+            try
             {
-                var arr = new JsonArray();
-                foreach (var child in children)
-                    arr.Add(SerializeLogicalNode(child, maxDepth, currentDepth + 1));
-                node["children"] = arr;
+                var children = logical.GetLogicalChildren().ToList();
+                if (children.Count > 0)
+                {
+                    var arr = new JsonArray();
+                    foreach (var child in children)
+                    {
+                        try
+                        {
+                            arr.Add(SerializeLogicalNode(child, maxDepth, currentDepth + 1));
+                        }
+                        catch (Exception ex)
+                        {
+                            arr.Add(new JsonObject
+                            {
+                                ["type"] = J.Str(child.GetType().Name),
+                                ["_error"] = J.Str($"{ex.GetType().Name}: {ex.Message}"),
+                            });
+                        }
+                    }
+                    node["children"] = arr;
+                }
+            }
+            catch (Exception ex)
+            {
+                node["_childrenError"] = J.Str($"{ex.GetType().Name}: {ex.Message}");
             }
         }
         else
         {
             var childCount = logical.GetLogicalChildren().Count();
             if (childCount > 0)
-                node["childCount"] = childCount;
+                node["childCount"] = J.Int(childCount);
         }
 
         return node;
