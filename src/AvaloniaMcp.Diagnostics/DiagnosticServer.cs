@@ -236,7 +236,9 @@ public sealed class DiagnosticServer : IDisposable
 
     private static void Log(string message)
     {
-        Debug.WriteLine($"[AvaloniaMcp] {message}");
-        Trace.WriteLine($"[AvaloniaMcp] {message}");
+        var msg = $"[AvaloniaMcp] {message}";
+        Debug.WriteLine(msg);
+        Trace.WriteLine(msg);
+        Console.Error.WriteLine(msg);
     }
 }

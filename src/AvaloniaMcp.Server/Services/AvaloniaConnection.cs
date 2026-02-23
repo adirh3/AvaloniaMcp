@@ -86,25 +86,37 @@ public sealed class AvaloniaConnection : IDisposable
 
     /// <summary>
     /// Send a request and return the full JSON response as a formatted string.
-    /// Throws if the response indicates failure.
+    /// Returns error text on failure instead of throwing, so the LLM sees the actual error.
     /// </summary>
     public async Task<string> RequestAsync(string method, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
     {
-        using var doc = await SendAsync(method, parameters, ct);
-        var root = doc.RootElement;
-
-        if (root.TryGetProperty("success", out var success) && !success.GetBoolean())
+        JsonDocument doc;
+        try
         {
-            var error = root.TryGetProperty("error", out var err) ? err.GetString() : "Unknown error";
-            throw new InvalidOperationException($"Avalonia diagnostic error: {error}");
+            doc = await SendAsync(method, parameters, ct);
+        }
+        catch (Exception ex)
+        {
+            return $"Error: {ex.Message}";
         }
 
-        if (root.TryGetProperty("data", out var data))
+        using (doc)
         {
-            return JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true });
-        }
+            var root = doc.RootElement;
 
-        return JsonSerializer.Serialize(root, new JsonSerializerOptions { WriteIndented = true });
+            if (root.TryGetProperty("success", out var success) && !success.GetBoolean())
+            {
+                var error = root.TryGetProperty("error", out var err) ? err.GetString() : "Unknown error";
+                return $"Error from Avalonia app: {error}";
+            }
+
+            if (root.TryGetProperty("data", out var data))
+            {
+                return JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true });
+            }
+
+            return JsonSerializer.Serialize(root, new JsonSerializerOptions { WriteIndented = true });
+        }
     }
 
     private async Task EnsureConnectedAsync(CancellationToken ct)

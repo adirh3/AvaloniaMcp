@@ -4,6 +4,13 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using AvaloniaMcp.Server.Services;
 
+// Handle version flag
+if (args.Length > 0 && args[0] is "--version" or "-v" or "version")
+{
+    Console.WriteLine("AvaloniaMcp 0.2.0");
+    return;
+}
+
 // Check for CLI mode: avalonia-mcp cli <method> [--param value ...]
 if (args.Length > 0 && args[0] == "cli")
 {
