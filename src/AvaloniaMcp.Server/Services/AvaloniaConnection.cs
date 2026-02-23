@@ -185,10 +185,10 @@ public sealed class AvaloniaConnection : IDisposable
                 var appVersion = versionEl.GetString();
                 _logger.LogInformation("[{PipeName}] Connected (protocol version: {Version})", _pipeName, appVersion);
 
-                if (appVersion != "0.2.0")
+                if (appVersion != "0.3.0")
                 {
                     _logger.LogWarning(
-                        "[{PipeName}] Protocol version mismatch: CLI tool is 0.2.0, app reports '{AppVersion}'. " +
+                        "[{PipeName}] Protocol version mismatch: CLI tool is 0.3.0, app reports '{AppVersion}'. " +
                         "Some tools may not work correctly. Update AvaloniaMcp.Diagnostics NuGet package to match.",
                         _pipeName, appVersion);
                 }
@@ -197,7 +197,7 @@ public sealed class AvaloniaConnection : IDisposable
             {
                 _logger.LogWarning(
                     "[{PipeName}] Protocol version could not be determined. " +
-                    "The app may be using an older AvaloniaMcp.Diagnostics version. Consider updating to 0.2.0+.",
+                    "The app may be using an older AvaloniaMcp.Diagnostics version. Consider updating to 0.3.0+.",
                     _pipeName);
             }
         }

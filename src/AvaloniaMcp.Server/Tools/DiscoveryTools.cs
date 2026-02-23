@@ -23,12 +23,12 @@ public sealed class DiscoveryTools
             if (obj.TryGetPropertyValue("protocolVersion", out var versionNode))
             {
                 var appVersion = versionNode?.GetValue<string>();
-                if (appVersion != "0.2.0")
-                    obj["versionWarning"] = $"App uses protocol v{appVersion}, CLI tool is v0.2.0. Some tools may not work. Update AvaloniaMcp.Diagnostics to match.";
+                if (appVersion != "0.3.0")
+                    obj["versionWarning"] = $"App uses protocol v{appVersion}, CLI tool is v0.3.0. Some tools may not work. Update AvaloniaMcp.Diagnostics to match.";
             }
             else
             {
-                obj["versionWarning"] = "App does not report protocol version. It may be using an older AvaloniaMcp.Diagnostics (<0.2.0). Update the package.";
+                obj["versionWarning"] = "App does not report protocol version. It may be using an older AvaloniaMcp.Diagnostics (<0.3.0). Update the package.";
             }
 
             results.Add(obj);

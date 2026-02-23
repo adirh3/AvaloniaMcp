@@ -7,7 +7,7 @@ using AvaloniaMcp.Server.Services;
 // Handle version flag
 if (args.Length > 0 && args[0] is "--version" or "-v" or "version")
 {
-    Console.WriteLine("AvaloniaMcp 0.2.0");
+    Console.WriteLine("AvaloniaMcp 0.3.0");
     return;
 }
 
@@ -15,7 +15,7 @@ if (args.Length > 0 && args[0] is "--version" or "-v" or "version")
 if (args.Length > 0 && args[0] is "--help" or "-h" or "help")
 {
     Console.WriteLine("""
-    AvaloniaMcp — MCP server for debugging Avalonia UI applications (v0.2.0)
+    AvaloniaMcp — MCP server for debugging Avalonia UI applications (v0.3.0)
 
     Usage:
       avalonia-mcp                     Start as MCP server (stdio transport, for AI agents)
@@ -30,7 +30,7 @@ if (args.Length > 0 && args[0] is "--help" or "-h" or "help")
     If no --pipe or --pid is given, the server auto-discovers running Avalonia apps
     when tools are invoked. Logs are written to stderr.
 
-    Compatible with AvaloniaMcp.Diagnostics v0.2.0. The in-app library must match
+    Compatible with AvaloniaMcp.Diagnostics v0.3.0. The in-app library must match
     or be updated to avoid protocol mismatches.
     """);
     return;
@@ -66,7 +66,7 @@ builder.Services
         options.ServerInfo = new()
         {
             Name = "AvaloniaMcp",
-            Version = "0.2.0"
+            Version = "0.3.0"
         };
         options.ServerInstructions = """
             Avalonia UI debugging server. Connects to a running Avalonia application and provides tools to inspect, debug, and interact with the UI.

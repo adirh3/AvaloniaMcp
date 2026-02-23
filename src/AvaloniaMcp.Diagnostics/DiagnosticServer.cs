@@ -232,7 +232,7 @@ public sealed class DiagnosticServer : IDisposable
     /// Protocol version for client-server compatibility checks.
     /// Bump this when the request/response format changes.
     /// </summary>
-    public const string ProtocolVersion = "0.2.0";
+    public const string ProtocolVersion = "0.3.0";
 
     private void WriteDiscoveryFile()
     {
