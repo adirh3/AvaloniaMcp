@@ -55,6 +55,14 @@ public sealed class ConnectionPool : IDisposable
             {
                 _logger.LogInformation("Evicting dead connection for PID {Pid}", resolvedPid.Value);
                 EvictConnection(resolvedPid.Value);
+
+                // Check for crash file written by the app before it died
+                var crashInfo = ReadAndDeleteCrashFile(resolvedPid.Value);
+                if (crashInfo is not null)
+                {
+                    _logger.LogWarning("Crash file found for PID {Pid}: {CrashInfo}", resolvedPid.Value, crashInfo);
+                    result += $"\n\n--- App crash details (PID {resolvedPid.Value}) ---\n{crashInfo}";
+                }
             }
         }
 
@@ -127,6 +135,23 @@ public sealed class ConnectionPool : IDisposable
     }
 
     /// <summary>
+    /// Read and delete the crash file left by an Avalonia app that crashed.
+    /// Returns the crash info text, or null if no crash file exists.
+    /// </summary>
+    internal static string? ReadAndDeleteCrashFile(int pid)
+    {
+        try
+        {
+            var path = Path.Combine(Path.GetTempPath(), "avalonia-mcp", $"{pid}.crash.txt");
+            if (!File.Exists(path)) return null;
+            var content = File.ReadAllText(path);
+            try { File.Delete(path); } catch { }
+            return content;
+        }
+        catch { return null; }
+    }
+
+    /// <summary>
     /// Discover available Avalonia apps by checking temp discovery files.
     /// </summary>
     public static List<JsonDocument> DiscoverApps()
@@ -154,6 +179,9 @@ public sealed class ConnectionPool : IDisposable
                     {
                         doc.Dispose();
                         try { File.Delete(file); } catch { }
+                        // Clean up any crash file for the dead process too
+                        var crashFile = Path.Combine(dir, $"{pid}.crash.txt");
+                        try { if (File.Exists(crashFile)) File.Delete(crashFile); } catch { }
                     }
                 }
             }

@@ -150,8 +150,8 @@ public sealed class DiagnosticServer : IDisposable
                 }
                 catch (Exception ex)
                 {
-                    Log($"Handler error for '{request.Method}': {ex.Message}");
-                    response = DiagnosticResponse.Fail($"Handler error: {ex.Message}");
+                    Log($"Handler error for '{request.Method}': {ex}");
+                    response = DiagnosticResponse.Fail($"Handler error: {ex}");
                 }
 
                 string responseJson;

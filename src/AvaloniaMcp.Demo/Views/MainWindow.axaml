@@ -38,6 +38,8 @@
                         <Button Name="AddItemBtn" Content="Add Item" Command="{Binding AddItemCommand}"/>
                         <Button Name="ResetBtn" Content="Reset" Command="{Binding ResetCommand}"
                                 Background="{DynamicResource WarningBrush}" Foreground="White"/>
+                        <Button Name="CrashBtn" Content="Crash!" Command="{Binding CrashCommand}"
+                                Background="Red" Foreground="White"/>
                     </StackPanel>
                     <TextBlock Name="ClickCounter" Text="{Binding ClickCountText}"/>
                 </StackPanel>

@@ -81,6 +81,7 @@ public class MainViewModel : INotifyPropertyChanged
     public ICommand IncrementCommand { get; }
     public ICommand ResetCommand { get; }
     public ICommand AddItemCommand { get; }
+    public ICommand CrashCommand { get; }
 
     public MainViewModel()
     {
@@ -106,6 +107,11 @@ public class MainViewModel : INotifyPropertyChanged
                 Todos.Add(new TodoItem(InputText, false));
                 InputText = "";
             }
+        });
+
+        CrashCommand = new RelayCommand(() =>
+        {
+            throw new InvalidOperationException("This is a test crash triggered by the Crash button!");
         });
     }
 

@@ -20,7 +20,31 @@ public static class DiagnosticExtensions
         // Hook into Avalonia's logging to capture binding errors
         Logger.Sink = new BindingErrorLogSink(Logger.Sink);
 
+        // Write crash file on unhandled exceptions so the MCP server can report them
+        AppDomain.CurrentDomain.UnhandledException += (_, args) =>
+        {
+            WriteCrashFile(args.ExceptionObject as Exception);
+        };
+
+        TaskScheduler.UnobservedTaskException += (_, args) =>
+        {
+            WriteCrashFile(args.Exception);
+        };
+
         return builder;
+    }
+
+    private static void WriteCrashFile(Exception? ex)
+    {
+        if (ex is null) return;
+        try
+        {
+            var dir = Path.Combine(Path.GetTempPath(), "avalonia-mcp");
+            Directory.CreateDirectory(dir);
+            var path = Path.Combine(dir, $"{Environment.ProcessId}.crash.txt");
+            File.WriteAllText(path, $"[{DateTime.UtcNow:O}] Unhandled exception:\n{ex}");
+        }
+        catch { /* best effort — process is dying */ }
     }
 
     public static DiagnosticServer? GetDiagnosticServer() => _server;
