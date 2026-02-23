@@ -8,7 +8,7 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>avalonia-mcp</ToolCommandName>
     <PackageId>AvaloniaMcp</PackageId>
-    <Version>0.1.0</Version>
+    <Version>0.1.1</Version>
     <Authors>adirh3</Authors>
     <Description>MCP server for debugging Avalonia UI applications. Provides 15 tools for inspecting, debugging, and interacting with running Avalonia apps via AI agents or CLI.</Description>
     <PackageTags>avalonia;mcp;debugging;ui;dotnet-tool;model-context-protocol</PackageTags>
