@@ -42,7 +42,7 @@ builder.Services
         options.ServerInfo = new()
         {
             Name = "AvaloniaMcp",
-            Version = "0.1.0"
+            Version = "0.2.0"
         };
         options.ServerInstructions = """
             Avalonia UI debugging server. Connects to a running Avalonia application and provides tools to inspect, debug, and interact with the UI.

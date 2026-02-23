@@ -35,7 +35,7 @@ public sealed class DiagnosticServer : IDisposable
         _cts = new CancellationTokenSource();
         _serverTask = Task.Run(() => RunServerAsync(_cts.Token));
 
-        // Write discovery file
+        // Write discovery file so the MCP tool can find us
         WriteDiscoveryFile();
     }
 
@@ -50,9 +50,10 @@ public sealed class DiagnosticServer : IDisposable
     {
         while (!ct.IsCancellationRequested)
         {
+            NamedPipeServerStream? pipe = null;
             try
             {
-                var pipe = new NamedPipeServerStream(
+                pipe = new NamedPipeServerStream(
                     _pipeName,
                     PipeDirection.InOut,
                     NamedPipeServerStream.MaxAllowedServerInstances,
@@ -62,6 +63,7 @@ public sealed class DiagnosticServer : IDisposable
                 await pipe.WaitForConnectionAsync(ct);
                 // Handle client on a background task; pipe ownership transferred
                 _ = HandleClientAsync(pipe, ct);
+                pipe = null; // ownership transferred
             }
             catch (OperationCanceledException)
             {
@@ -69,8 +71,12 @@ public sealed class DiagnosticServer : IDisposable
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[AvaloniaMcp] Server error: {ex.Message}");
+                Log($"Server error: {ex.Message}");
                 await Task.Delay(1000, ct);
+            }
+            finally
+            {
+                pipe?.Dispose();
             }
         }
     }
@@ -79,21 +85,41 @@ public sealed class DiagnosticServer : IDisposable
     {
         try
         {
-            await using var _ = pipe; // dispose when handler completes
             var encoding = new UTF8Encoding(false);
-            using var reader = new StreamReader(pipe, encoding, false, 4096, leaveOpen: true);
-            using var writer = new StreamWriter(pipe, encoding, 4096, leaveOpen: true) { AutoFlush = true };
+            using var reader = new StreamReader(pipe, encoding, false, 1024, leaveOpen: true);
+            await using var writer = new StreamWriter(pipe, encoding, 1024, leaveOpen: true);
+            writer.AutoFlush = true;
 
             while (!ct.IsCancellationRequested && pipe.IsConnected)
             {
-                var line = await reader.ReadLineAsync(ct);
+                string? line;
+                try
+                {
+                    line = await reader.ReadLineAsync(ct);
+                }
+                catch (IOException)
+                {
+                    break; // client disconnected
+                }
+                
                 if (line is null) break;
+                if (string.IsNullOrWhiteSpace(line)) continue;
 
-                var request = JsonSerializer.Deserialize<DiagnosticRequest>(line, JsonOptions);
+                DiagnosticRequest? request;
+                try
+                {
+                    request = JsonSerializer.Deserialize<DiagnosticRequest>(line, JsonOptions);
+                }
+                catch (JsonException ex)
+                {
+                    Log($"Failed to parse request: {ex.Message}");
+                    await WriteResponse(writer, pipe, DiagnosticResponse.Fail($"Invalid JSON: {ex.Message}"));
+                    continue;
+                }
+
                 if (request is null)
                 {
-                    await writer.WriteLineAsync(JsonSerializer.Serialize(
-                        DiagnosticResponse.Fail("Invalid request"), JsonOptions));
+                    await WriteResponse(writer, pipe, DiagnosticResponse.Fail("Invalid request"));
                     continue;
                 }
 
@@ -104,6 +130,7 @@ public sealed class DiagnosticServer : IDisposable
                 }
                 catch (Exception ex)
                 {
+                    Log($"Handler error for '{request.Method}': {ex.Message}");
                     response = DiagnosticResponse.Fail($"Handler error: {ex.Message}");
                 }
 
@@ -114,18 +141,39 @@ public sealed class DiagnosticServer : IDisposable
                 }
                 catch (Exception serEx)
                 {
+                    Log($"Serialization error for '{request.Method}': {serEx.Message}");
                     responseJson = JsonSerializer.Serialize(
                         DiagnosticResponse.Fail($"Serialization error: {serEx.Message}"), JsonOptions);
                 }
 
-                await writer.WriteLineAsync(responseJson);
-                await writer.FlushAsync(ct);
+                try
+                {
+                    await writer.WriteLineAsync(responseJson);
+                    await writer.FlushAsync(ct);
+                    await pipe.FlushAsync(ct);
+                }
+                catch (IOException)
+                {
+                    break; // client disconnected
+                }
             }
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[AvaloniaMcp] Client handler error: {ex.Message}");
+            Log($"Client handler error: {ex.GetType().Name}: {ex.Message}");
         }
+        finally
+        {
+            try { pipe.Dispose(); } catch { }
+        }
+    }
+
+    private static async Task WriteResponse(StreamWriter writer, NamedPipeServerStream pipe, DiagnosticResponse response)
+    {
+        var json = JsonSerializer.Serialize(response, JsonOptions);
+        await writer.WriteLineAsync(json);
+        await writer.FlushAsync();
+        await pipe.FlushAsync();
     }
 
     private static async Task<DiagnosticResponse> DispatchAsync(DiagnosticRequest request)
@@ -146,7 +194,7 @@ public sealed class DiagnosticServer : IDisposable
             "set_property" => await InteractionHandler.SetProperty(request),
             "input_text" => await InteractionHandler.InputText(request),
             "take_screenshot" => await InteractionHandler.TakeScreenshot(request),
-            "ping" => Task.FromResult(DiagnosticResponse.Ok(new { status = "ok", pid = Environment.ProcessId })).Result,
+            "ping" => DiagnosticResponse.Ok(new { status = "ok", pid = Environment.ProcessId }),
             _ => DiagnosticResponse.Fail($"Unknown method: {request.Method}"),
         };
     }
@@ -157,6 +205,7 @@ public sealed class DiagnosticServer : IDisposable
         {
             var dir = Path.Combine(Path.GetTempPath(), "avalonia-mcp");
             Directory.CreateDirectory(dir);
+            var path = Path.Combine(dir, $"{Environment.ProcessId}.json");
             var info = new
             {
                 pid = Environment.ProcessId,
@@ -164,11 +213,14 @@ public sealed class DiagnosticServer : IDisposable
                 processName = Process.GetCurrentProcess().ProcessName,
                 startTime = DateTime.UtcNow.ToString("O"),
             };
-            File.WriteAllText(
-                Path.Combine(dir, $"{Environment.ProcessId}.json"),
-                JsonSerializer.Serialize(info, JsonOptions));
+            var json = JsonSerializer.Serialize(info, JsonOptions);
+            File.WriteAllText(path, json);
+            Log($"Discovery file written: {path}");
         }
-        catch { /* best effort */ }
+        catch (Exception ex)
+        {
+            Log($"Failed to write discovery file: {ex.Message}");
+        }
     }
 
     private void RemoveDiscoveryFile()
@@ -180,5 +232,11 @@ public sealed class DiagnosticServer : IDisposable
                 File.Delete(path);
         }
         catch { /* best effort */ }
+    }
+
+    private static void Log(string message)
+    {
+        Debug.WriteLine($"[AvaloniaMcp] {message}");
+        Trace.WriteLine($"[AvaloniaMcp] {message}");
     }
 }

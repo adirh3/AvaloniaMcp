@@ -60,6 +60,7 @@ public sealed class AvaloniaConnection : IDisposable
             var json = JsonSerializer.Serialize(request, JsonOptions);
             await _writer!.WriteLineAsync(json);
             await _writer.FlushAsync(ct);
+            await _pipe!.FlushAsync(ct);
 
             var response = await _reader!.ReadLineAsync(ct);
             if (response is null)
@@ -68,6 +69,7 @@ public sealed class AvaloniaConnection : IDisposable
                 await ReconnectAsync(ct);
                 await _writer!.WriteLineAsync(json);
                 await _writer.FlushAsync(ct);
+                await _pipe!.FlushAsync(ct);
                 response = await _reader!.ReadLineAsync(ct);
             }
 
@@ -146,8 +148,8 @@ public sealed class AvaloniaConnection : IDisposable
         _pipe = new NamedPipeClientStream(".", pipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
         await _pipe.ConnectAsync(5000, ct);
         var encoding = new System.Text.UTF8Encoding(false);
-        _reader = new StreamReader(_pipe, encoding, false, 4096, leaveOpen: true);
-        _writer = new StreamWriter(_pipe, encoding, 4096, leaveOpen: true) { AutoFlush = true };
+        _reader = new StreamReader(_pipe, encoding, false, 1024, leaveOpen: true);
+        _writer = new StreamWriter(_pipe, encoding, 1024, leaveOpen: true) { AutoFlush = true };
     }
 
     private void Disconnect()
