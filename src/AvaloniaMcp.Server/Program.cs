@@ -20,39 +20,13 @@ if (args.Length > 0 && args[0] == "cli")
 }
 
 // Standard MCP server mode (stdio transport)
+// The server starts immediately — connection to an Avalonia app is lazy (on first tool call).
 var pipeName = GetArg(args, "--pipe") ?? GetArg(args, "-p");
 var pid = GetArg(args, "--pid");
 
 // If PID is specified, derive pipe name
 if (pipeName is null && pid is not null)
     pipeName = $"avalonia-mcp-{pid}";
-
-// Auto-discover if no pipe specified
-if (pipeName is null)
-{
-    var apps = AvaloniaConnection.DiscoverApps();
-    if (apps.Count == 1)
-    {
-        pipeName = apps[0].RootElement.GetProperty("pipeName").GetString();
-        foreach (var app in apps) app.Dispose();
-    }
-    else if (apps.Count > 1)
-    {
-        Console.Error.WriteLine("Multiple Avalonia apps found. Specify --pipe or --pid:");
-        foreach (var app in apps)
-        {
-            var root = app.RootElement;
-            Console.Error.WriteLine($"  --pid {root.GetProperty("pid")} ({root.GetProperty("processName")})");
-            app.Dispose();
-        }
-        return;
-    }
-    else
-    {
-        Console.Error.WriteLine("No Avalonia apps with MCP diagnostics found. Start an app with .UseMcpDiagnostics() first, or specify --pipe <name>.");
-        return;
-    }
-}
 
 var builder = Host.CreateApplicationBuilder(args);
 

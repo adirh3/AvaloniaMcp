@@ -9,12 +9,22 @@
     <ToolCommandName>avalonia-mcp</ToolCommandName>
     <PackageId>AvaloniaMcp</PackageId>
     <Version>0.1.0</Version>
-    <Description>MCP server for debugging Avalonia UI applications</Description>
+    <Authors>adirh3</Authors>
+    <Description>MCP server for debugging Avalonia UI applications. Provides 15 tools for inspecting, debugging, and interacting with running Avalonia apps via AI agents or CLI.</Description>
+    <PackageTags>avalonia;mcp;debugging;ui;dotnet-tool;model-context-protocol</PackageTags>
+    <PackageProjectUrl>https://github.com/adirh3/AvaloniaMcp</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/adirh3/AvaloniaMcp</RepositoryUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.0-*" />
     <PackageReference Include="ModelContextProtocol" Version="0.8.0-preview.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
 </Project>

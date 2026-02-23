@@ -1,13 +1,26 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <PackageId>AvaloniaMcp.Diagnostics</PackageId>
+    <Version>0.1.0</Version>
+    <Authors>adirh3</Authors>
+    <Description>Add MCP (Model Context Protocol) diagnostics to your Avalonia app. Enables AI agents and CLI tools to inspect, debug, and interact with your running UI.</Description>
+    <PackageTags>avalonia;mcp;diagnostics;debugging;ui;model-context-protocol</PackageTags>
+    <PackageProjectUrl>https://github.com/adirh3/AvaloniaMcp</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/adirh3/AvaloniaMcp</RepositoryUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Avalonia" Version="11.2.*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
 </Project>

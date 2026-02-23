@@ -9,7 +9,7 @@ namespace AvaloniaMcp.Server.Services;
 /// </summary>
 public sealed class AvaloniaConnection : IDisposable
 {
-    private readonly string _pipeName;
+    private string? _pipeName;
     private NamedPipeClientStream? _pipe;
     private StreamReader? _reader;
     private StreamWriter? _writer;
@@ -22,12 +22,11 @@ public sealed class AvaloniaConnection : IDisposable
         Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
     };
 
-    public string PipeName => _pipeName;
+    public string? PipeName => _pipeName;
 
     public AvaloniaConnection(ConnectionOptions options)
     {
-        _pipeName = options.PipeName ?? throw new InvalidOperationException(
-            "No pipe name specified. Use --pipe <name> or --pid <processId>");
+        _pipeName = options.PipeName;
     }
 
     public async Task<JsonDocument> SendAsync(string method, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
@@ -99,11 +98,35 @@ public sealed class AvaloniaConnection : IDisposable
         await ReconnectAsync(ct);
     }
 
+    private string ResolvePipeName()
+    {
+        if (_pipeName is not null)
+            return _pipeName;
+
+        var apps = DiscoverApps();
+        if (apps.Count == 1)
+        {
+            _pipeName = apps[0].RootElement.GetProperty("pipeName").GetString()!;
+            foreach (var app in apps) app.Dispose();
+            return _pipeName;
+        }
+
+        foreach (var app in apps) app.Dispose();
+
+        if (apps.Count > 1)
+            throw new InvalidOperationException(
+                $"Multiple Avalonia apps found ({apps.Count}). Use discover_apps to list them, then specify --pipe or --pid.");
+
+        throw new InvalidOperationException(
+            "No Avalonia apps with MCP diagnostics found. Start your Avalonia app with .UseMcpDiagnostics() first.");
+    }
+
     private async Task ReconnectAsync(CancellationToken ct)
     {
         Disconnect();
 
-        _pipe = new NamedPipeClientStream(".", _pipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
+        var pipeName = ResolvePipeName();
+        _pipe = new NamedPipeClientStream(".", pipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
         await _pipe.ConnectAsync(5000, ct);
         var encoding = new System.Text.UTF8Encoding(false);
         _reader = new StreamReader(_pipe, encoding, false, 4096, leaveOpen: true);
