@@ -58,12 +58,12 @@ public sealed class InspectionTools
     }
 
     [McpServerTool(Name = "find_control", ReadOnly = true, Destructive = false),
-     Description("Search for controls by name, type, or text content across all windows. Returns matching controls with their type, bounds, and content. Use this to locate specific UI elements.")]
+     Description("Search for controls by name, type, or text content across all windows. Traverses into control templates (finds PART_ elements). Returns matching controls with their type, bounds, and content.")]
     public static async Task<string> FindControl(
         AvaloniaConnection connection,
-        [Description("Find controls whose Name contains this string (case-insensitive).")] string? name = null,
+        [Description("Find controls whose Name contains this string (case-insensitive). '#' prefix is stripped automatically.")] string? name = null,
         [Description("Find controls whose type name contains this string (e.g. 'Button', 'TextBox').")] string? typeName = null,
-        [Description("Find controls displaying this text content.")] string? text = null,
+        [Description("Find controls displaying this text content (searches TextBlock, ContentControl, AccessText, HeaderedContentControl, etc.).")] string? text = null,
         [Description("Maximum results to return. Default: 20.")] int maxResults = 20,
         [Description("Process ID of the Avalonia app to connect to. If omitted, auto-discovers.")] int? pid = null,
         CancellationToken ct = default)

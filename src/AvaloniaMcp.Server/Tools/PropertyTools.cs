@@ -23,10 +23,12 @@ public sealed class PropertyTools
     }
 
     [McpServerTool(Name = "get_data_context", ReadOnly = true, Destructive = false),
-     Description("Get the DataContext (ViewModel) of a control. Returns the type and all public properties of the bound ViewModel, serialized as JSON. Critical for debugging data binding issues.")]
+     Description("Get the DataContext (ViewModel) of a control. Returns the type and all public properties of the bound ViewModel, serialized as JSON. Use expandProperty to read items from collection properties like ObservableCollection<T>.")]
     public static async Task<string> GetDataContext(
         AvaloniaConnection connection,
         [Description("Control identifier. If omitted, returns the main window's DataContext.")] string? controlId = null,
+        [Description("Name of a collection property to expand (e.g. 'Messages', 'Items'). Returns the actual items with their properties.")] string? expandProperty = null,
+        [Description("Maximum number of items to return when expanding a collection. Default: 50.")] int maxItems = 50,
         [Description("Process ID of the Avalonia app to connect to. If omitted, auto-discovers.")] int? pid = null,
         CancellationToken ct = default)
     {
@@ -34,6 +36,8 @@ public sealed class PropertyTools
         return await connection.RequestAsync("get_data_context", new()
         {
             ["controlId"] = controlId,
+            ["expandProperty"] = expandProperty,
+            ["maxItems"] = maxItems,
         }, ct);
     }
 

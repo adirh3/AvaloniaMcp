@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using System.Text.Json.Nodes;
 using AvaloniaMcp.Diagnostics.Protocol;
 
@@ -99,7 +100,67 @@ internal static class InteractionHandler
                 return DiagnosticResponse.Ok(new JsonObject { ["typed"] = J.Bool(true), ["controlType"] = J.Str("AutoCompleteBox"), ["text"] = J.Str(text) });
             }
 
-            return DiagnosticResponse.Fail($"Control type {control.GetType().Name} does not support text input. Use a TextBox or similar.");
+            // Auto-find the first TextBox child inside composite controls
+            var childTextBox = control.GetVisualDescendants().OfType<TextBox>().FirstOrDefault();
+            if (childTextBox is not null)
+            {
+                childTextBox.Text = text;
+                return DiagnosticResponse.Ok(new JsonObject
+                {
+                    ["typed"] = J.Bool(true),
+                    ["controlType"] = J.Str(control.GetType().Name),
+                    ["resolvedTo"] = J.Str(childTextBox.Name ?? childTextBox.GetType().Name),
+                    ["text"] = J.Str(text),
+                });
+            }
+
+            return DiagnosticResponse.Fail($"Control type {control.GetType().Name} does not contain a TextBox. Use a TextBox or similar.");
+        });
+    }
+
+    public static async Task<DiagnosticResponse> InvokeCommand(DiagnosticRequest req)
+    {
+        return await Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            var controlId = req.GetString("controlId");
+            var commandName = req.GetString("commandName");
+            var parameterValue = req.GetString("parameter");
+
+            if (string.IsNullOrEmpty(commandName))
+                return DiagnosticResponse.Fail("commandName is required");
+
+            var control = ControlResolver.Resolve(controlId);
+            if (control is null)
+                return DiagnosticResponse.Fail($"Control '{controlId}' not found");
+
+            var dc = control.DataContext;
+            if (dc is null)
+                return DiagnosticResponse.Fail($"Control '{controlId}' has no DataContext");
+
+            // Find the ICommand property on the DataContext
+            var prop = dc.GetType().GetProperty(commandName, System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+            if (prop is null)
+                return DiagnosticResponse.Fail($"Property '{commandName}' not found on {dc.GetType().Name}");
+
+            var command = prop.GetValue(dc) as System.Windows.Input.ICommand;
+            if (command is null)
+                return DiagnosticResponse.Fail($"Property '{commandName}' on {dc.GetType().Name} is not an ICommand (got {prop.PropertyType.Name})");
+
+            if (!command.CanExecute(parameterValue))
+                return DiagnosticResponse.Ok(new JsonObject
+                {
+                    ["executed"] = J.Bool(false),
+                    ["reason"] = J.Str("CanExecute returned false"),
+                    ["commandName"] = J.Str(commandName),
+                });
+
+            command.Execute(parameterValue);
+            return DiagnosticResponse.Ok(new JsonObject
+            {
+                ["executed"] = J.Bool(true),
+                ["commandName"] = J.Str(commandName),
+                ["dataContextType"] = J.Str(dc.GetType().Name),
+            });
         });
     }
 

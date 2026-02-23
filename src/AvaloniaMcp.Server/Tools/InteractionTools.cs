@@ -42,10 +42,10 @@ public sealed class InteractionTools
     }
 
     [McpServerTool(Name = "input_text", ReadOnly = false, Destructive = false),
-     Description("Type text into a TextBox or similar input control. Sets the Text property directly.")]
+     Description("Type text into a TextBox or similar input control. If the target control is not a TextBox (e.g. a composite UserControl), automatically finds the first TextBox child inside it.")]
     public static async Task<string> InputText(
         AvaloniaConnection connection,
-        [Description("Control identifier for the TextBox.")] string controlId,
+        [Description("Control identifier for the TextBox or a parent control containing a TextBox.")] string controlId,
         [Description("The text to enter.")] string text,
         [Description("Process ID of the Avalonia app to connect to. If omitted, auto-discovers.")] int? pid = null,
         CancellationToken ct = default)
@@ -72,6 +72,26 @@ public sealed class InteractionTools
         {
             ["windowIndex"] = windowIndex,
             ["controlId"] = controlId,
+        }, ct);
+    }
+
+    [McpServerTool(Name = "invoke_command", ReadOnly = false, Destructive = false),
+     Description("Execute an ICommand on a control's DataContext (ViewModel). This is the most direct way to trigger ViewModel actions like SendMessage, Save, Delete, etc. without needing to find and click the bound button.")]
+    public static async Task<string> InvokeCommand(
+        AvaloniaConnection connection,
+        [Description("Control identifier whose DataContext contains the command.")] string controlId,
+        [Description("Name of the ICommand property on the DataContext (e.g. 'SendMessageCommand', 'SaveCommand').")]
+        string commandName,
+        [Description("Optional parameter to pass to the command's Execute method.")] string? parameter = null,
+        [Description("Process ID of the Avalonia app to connect to. If omitted, auto-discovers.")] int? pid = null,
+        CancellationToken ct = default)
+    {
+        if (pid.HasValue) connection.SwitchTo(pid.Value);
+        return await connection.RequestAsync("invoke_command", new()
+        {
+            ["controlId"] = controlId,
+            ["commandName"] = commandName,
+            ["parameter"] = parameter,
         }, ct);
     }
 }

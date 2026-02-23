@@ -63,6 +63,8 @@ internal static class PropertyHandler
         return await Dispatcher.UIThread.InvokeAsync(() =>
         {
             var controlId = req.GetString("controlId");
+            var expandProperty = req.GetString("expandProperty");
+            var maxItems = req.GetInt("maxItems", 50);
             var control = ControlResolver.Resolve(controlId)
                 ?? ControlResolver.GetMainWindow();
             if (control is null)
@@ -79,6 +81,57 @@ internal static class PropertyHandler
                 ["dataContextType"] = J.Str(dc.GetType().FullName),
                 ["properties"] = SerializeObject(dc),
             };
+
+            // Expand a specific collection property if requested
+            if (!string.IsNullOrEmpty(expandProperty))
+            {
+                var prop = dc.GetType().GetProperty(expandProperty, BindingFlags.Public | BindingFlags.Instance);
+                if (prop is null)
+                {
+                    result["expandError"] = J.Str($"Property '{expandProperty}' not found on {dc.GetType().Name}");
+                }
+                else
+                {
+                    var value = prop.GetValue(dc);
+                    if (value is System.Collections.IEnumerable enumerable and not string)
+                    {
+                        var items = new JsonArray();
+                        var count = 0;
+                        foreach (var item in enumerable)
+                        {
+                            if (count >= maxItems) break;
+                            if (item is null)
+                                items.Add(null);
+                            else
+                                items.Add(new JsonObject
+                                {
+                                    ["_index"] = J.Int(count),
+                                    ["_type"] = J.Str(item.GetType().Name),
+                                    ["properties"] = SerializeObject(item),
+                                });
+                            count++;
+                        }
+                        result["expanded"] = new JsonObject
+                        {
+                            ["property"] = J.Str(expandProperty),
+                            ["itemType"] = J.Str(prop.PropertyType.IsGenericType
+                                ? prop.PropertyType.GetGenericArguments()[0].Name
+                                : prop.PropertyType.Name),
+                            ["count"] = J.Int(count),
+                            ["items"] = items,
+                        };
+                    }
+                    else
+                    {
+                        result["expanded"] = new JsonObject
+                        {
+                            ["property"] = J.Str(expandProperty),
+                            ["value"] = J.Str(SafeSerialize(value)),
+                            ["type"] = J.Str(value?.GetType().Name),
+                        };
+                    }
+                }
+            }
 
             return DiagnosticResponse.Ok(result);
         });

@@ -101,10 +101,19 @@ internal static class InspectionHandler
             var text = req.GetString("text");
             var maxResults = req.GetInt("maxResults", 20);
 
+            // Strip leading '#' from name if present (users may pass '#MyButton' from controlId syntax)
+            if (name is not null && name.StartsWith('#'))
+                name = name[1..];
+
+            var hasFilter = !string.IsNullOrEmpty(name) || !string.IsNullOrEmpty(typeName) || !string.IsNullOrEmpty(text);
+            if (!hasFilter)
+                return DiagnosticResponse.Fail("At least one filter (name, typeName, or text) is required.");
+
             var results = new JsonArray();
 
             foreach (var window in ControlResolver.GetWindows())
             {
+                // GetVisualDescendants traverses into control templates (PART_ elements etc.)
                 foreach (var desc in window.GetVisualDescendants())
                 {
                     if (results.Count >= maxResults) break;
@@ -115,17 +124,9 @@ internal static class InspectionHandler
                     if (!string.IsNullOrEmpty(typeName))
                         matches &= desc.GetType().Name.Contains(typeName, StringComparison.OrdinalIgnoreCase);
                     if (!string.IsNullOrEmpty(text))
-                    {
-                        var controlText = desc switch
-                        {
-                            TextBlock tb => tb.Text,
-                            ContentControl cc when cc.Content is string s => s,
-                            _ => null
-                        };
-                        matches &= controlText?.Contains(text, StringComparison.OrdinalIgnoreCase) == true;
-                    }
+                        matches &= GetDisplayText(desc)?.Contains(text, StringComparison.OrdinalIgnoreCase) == true;
 
-                    if (matches && (!string.IsNullOrEmpty(name) || !string.IsNullOrEmpty(typeName) || !string.IsNullOrEmpty(text)))
+                    if (matches)
                     {
                         results.Add(ControlResolver.SerializeNode(desc, maxDepth: 0));
                     }
@@ -134,6 +135,21 @@ internal static class InspectionHandler
 
             return DiagnosticResponse.Ok(results);
         });
+    }
+
+    /// <summary>
+    /// Extract display text from a visual element, checking multiple common control types.
+    /// </summary>
+    private static string? GetDisplayText(Visual visual)
+    {
+        return visual switch
+        {
+            TextBlock tb => tb.Text,
+            TextBox txb => txb.Text,
+            ContentControl cc when cc.Content is string s => s,
+            ContentControl cc when cc.Content is TextBlock ctb => ctb.Text,
+            _ => null,
+        };
     }
 
     public static async Task<DiagnosticResponse> GetFocusedElement()
