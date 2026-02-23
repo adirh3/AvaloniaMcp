@@ -13,7 +13,7 @@ public sealed class DiscoveryTools
      Description("Discover running Avalonia applications that have MCP diagnostics enabled. Returns process ID, pipe name, process name, and protocol version for each app. Use this when you don't know which app to connect to.")]
     public static Task<string> DiscoverApps(CancellationToken ct = default)
     {
-        var apps = AvaloniaConnection.DiscoverApps();
+        var apps = ConnectionPool.DiscoverApps();
         var results = new List<JsonObject>();
         foreach (var app in apps)
         {

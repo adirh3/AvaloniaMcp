@@ -7,48 +7,39 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace AvaloniaMcp.Server.Services;
 
 /// <summary>
-/// Connects to a running Avalonia app's diagnostic server via named pipe.
+/// A single named-pipe connection to one Avalonia app.
+/// Each instance is bound to one pipe name (one PID) for its lifetime.
+/// Use <see cref="ConnectionPool"/> to manage connections to multiple apps.
 /// </summary>
 public sealed class AvaloniaConnection : IDisposable
 {
-    private string? _pipeName;
+    private readonly string _pipeName;
     private NamedPipeClientStream? _pipe;
     private StreamReader? _reader;
     private StreamWriter? _writer;
     private readonly SemaphoreSlim _semaphore = new(1, 1);
-    private readonly ILogger<AvaloniaConnection> _logger;
+    private readonly ILogger _logger;
     private bool _validated;
+    private DateTime _lastUsed = DateTime.UtcNow;
 
-    private static readonly JsonSerializerOptions JsonOptions = new()
+    internal static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         WriteIndented = false,
         Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
     };
 
-    public string? PipeName => _pipeName;
-    private readonly string? _fixedPipeName;
+    internal static readonly JsonSerializerOptions IndentedOptions = new() { WriteIndented = true };
 
-    public AvaloniaConnection(ConnectionOptions options, ILogger<AvaloniaConnection>? logger = null)
+    public string PipeName => _pipeName;
+
+    /// <summary>Last time this connection was used for a request.</summary>
+    public DateTime LastUsed => _lastUsed;
+
+    public AvaloniaConnection(string pipeName, ILogger? logger = null)
     {
-        _pipeName = options.PipeName;
-        _fixedPipeName = options.PipeName;
-        _logger = logger ?? NullLogger<AvaloniaConnection>.Instance;
-    }
-
-    /// <summary>
-    /// Switch to a specific Avalonia app by PID. Disconnects from the current app if different.
-    /// </summary>
-    public void SwitchTo(int pid)
-    {
-        var newPipe = $"avalonia-mcp-{pid}";
-        if (_pipeName == newPipe && _pipe is { IsConnected: true })
-            return;
-
-        _logger.LogDebug("Switching to PID {Pid} (pipe: {PipeName})", pid, newPipe);
-        Disconnect();
-        _pipeName = newPipe;
-        _validated = false;
+        _pipeName = pipeName;
+        _logger = logger ?? NullLogger.Instance;
     }
 
     public async Task<JsonDocument> SendAsync(string method, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
@@ -56,41 +47,22 @@ public sealed class AvaloniaConnection : IDisposable
         await _semaphore.WaitAsync(ct);
         try
         {
-            await EnsureConnectedAsync(ct);
-
-            var request = new
+            _lastUsed = DateTime.UtcNow;
+            try
             {
-                method,
-                @params = parameters ?? new Dictionary<string, object?>(),
-            };
-
-            var json = JsonSerializer.Serialize(request, JsonOptions);
-            _logger.LogDebug("Sending: {Json}", json);
-            await _writer!.WriteLineAsync(json);
-            await _writer.FlushAsync(ct);
-            await _pipe!.FlushAsync(ct);
-
-            var response = await _reader!.ReadLineAsync(ct);
-            if (response is null)
-            {
-                _logger.LogWarning("Null response from pipe, attempting reconnect");
-                // Connection was lost — try to reconnect once
-                await ReconnectAsync(ct);
-                await _writer!.WriteLineAsync(json);
-                await _writer.FlushAsync(ct);
-                await _pipe!.FlushAsync(ct);
-                response = await _reader!.ReadLineAsync(ct);
+                return await SendCoreAsync(method, parameters, ct);
             }
-
-            if (response is null)
-                throw new InvalidOperationException("No response from Avalonia app (pipe returned null after reconnect)");
-
-            _logger.LogDebug("Received: {Response}", response.Length > 500 ? response[..500] + "..." : response);
-            return JsonDocument.Parse(response);
+            catch (Exception ex) when (IsPipeError(ex))
+            {
+                _logger.LogWarning(ex, "Pipe error for '{Method}' on '{PipeName}', reconnecting and retrying once...", method, _pipeName);
+                Disconnect();
+                _validated = false;
+                return await SendCoreAsync(method, parameters, ct);
+            }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "SendAsync failed for method '{Method}'", method);
+            _logger.LogError(ex, "SendAsync failed for method '{Method}' on pipe '{PipeName}'", method, _pipeName);
             throw;
         }
         finally
@@ -98,6 +70,33 @@ public sealed class AvaloniaConnection : IDisposable
             _semaphore.Release();
         }
     }
+
+    private async Task<JsonDocument> SendCoreAsync(string method, Dictionary<string, object?>? parameters, CancellationToken ct)
+    {
+        await EnsureConnectedAsync(ct);
+
+        var request = new
+        {
+            method,
+            @params = parameters ?? new Dictionary<string, object?>(),
+        };
+
+        var json = JsonSerializer.Serialize(request, JsonOptions);
+        _logger.LogDebug("[{PipeName}] Sending: {Json}", _pipeName, json);
+        await _writer!.WriteLineAsync(json);
+        await _writer.FlushAsync(ct);
+        await _pipe!.FlushAsync(ct);
+
+        var response = await _reader!.ReadLineAsync(ct);
+        if (response is null)
+            throw new IOException($"Pipe '{_pipeName}' returned null response — connection lost");
+
+        _logger.LogDebug("[{PipeName}] Received: {Response}", _pipeName, response.Length > 500 ? response[..500] + "..." : response);
+        return JsonDocument.Parse(response);
+    }
+
+    private static bool IsPipeError(Exception ex)
+        => ex is IOException or ObjectDisposedException;
 
     /// <summary>
     /// Send a request and return the full JSON response as a formatted string.
@@ -139,10 +138,10 @@ public sealed class AvaloniaConnection : IDisposable
 
             if (root.TryGetProperty("data", out var data))
             {
-                return JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true });
+                return JsonSerializer.Serialize(data, IndentedOptions);
             }
 
-            return JsonSerializer.Serialize(root, new JsonSerializerOptions { WriteIndented = true });
+            return JsonSerializer.Serialize(root, IndentedOptions);
         }
     }
 
@@ -159,9 +158,6 @@ public sealed class AvaloniaConnection : IDisposable
         await ValidateProtocolAsync(ct);
     }
 
-    /// <summary>
-    /// Send a ping to verify the connection works and check protocol version compatibility.
-    /// </summary>
     private async Task ValidateProtocolAsync(CancellationToken ct)
     {
         try
@@ -174,8 +170,8 @@ public sealed class AvaloniaConnection : IDisposable
 
             if (response is null)
             {
-                _logger.LogWarning("Ping returned null — pipe may be broken");
-                _validated = true; // avoid retry loop, let the actual call surface the error
+                _logger.LogWarning("[{PipeName}] Ping returned null — pipe may be broken", _pipeName);
+                _validated = true;
                 return;
             }
 
@@ -187,73 +183,38 @@ public sealed class AvaloniaConnection : IDisposable
                 && data.TryGetProperty("protocolVersion", out var versionEl))
             {
                 var appVersion = versionEl.GetString();
-                _logger.LogInformation("Connected to Avalonia app on pipe '{PipeName}' (protocol version: {Version})", _pipeName, appVersion);
+                _logger.LogInformation("[{PipeName}] Connected (protocol version: {Version})", _pipeName, appVersion);
 
                 if (appVersion != "0.2.0")
                 {
                     _logger.LogWarning(
-                        "Protocol version mismatch: CLI tool is 0.2.0, app reports '{AppVersion}'. " +
+                        "[{PipeName}] Protocol version mismatch: CLI tool is 0.2.0, app reports '{AppVersion}'. " +
                         "Some tools may not work correctly. Update AvaloniaMcp.Diagnostics NuGet package to match.",
-                        appVersion);
+                        _pipeName, appVersion);
                 }
             }
             else
             {
-                // Older diagnostics library without protocol version — warn but continue
                 _logger.LogWarning(
-                    "Connected to Avalonia app on pipe '{PipeName}' but protocol version could not be determined. " +
+                    "[{PipeName}] Protocol version could not be determined. " +
                     "The app may be using an older AvaloniaMcp.Diagnostics version. Consider updating to 0.2.0+.",
                     _pipeName);
             }
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Protocol validation ping failed — connection may be unstable");
+            _logger.LogWarning(ex, "[{PipeName}] Protocol validation ping failed — connection may be unstable", _pipeName);
         }
 
         _validated = true;
-    }
-
-    private string ResolvePipeName()
-    {
-        // If a pipe was explicitly set (via --pipe, --pid, or SwitchTo), use it
-        if (_pipeName is not null)
-        {
-            _logger.LogDebug("Using pipe name '{PipeName}'", _pipeName);
-            return _pipeName;
-        }
-
-        // Auto-discover
-        var apps = DiscoverApps();
-        if (apps.Count == 1)
-        {
-            _pipeName = apps[0].RootElement.GetProperty("pipeName").GetString()!;
-            _logger.LogInformation("Auto-discovered single Avalonia app on pipe '{PipeName}'", _pipeName);
-            foreach (var app in apps) app.Dispose();
-            return _pipeName;
-        }
-
-        foreach (var app in apps) app.Dispose();
-
-        if (apps.Count > 1)
-        {
-            _logger.LogWarning("Multiple Avalonia apps found ({Count}). Caller must specify pid.", apps.Count);
-            throw new InvalidOperationException(
-                $"Multiple Avalonia apps found ({apps.Count}). Call discover_apps first, then pass the pid parameter to target a specific app.");
-        }
-
-        _logger.LogWarning("No Avalonia apps with MCP diagnostics found");
-        throw new InvalidOperationException(
-            "No Avalonia apps with MCP diagnostics found. Start your Avalonia app with .UseMcpDiagnostics() first.");
     }
 
     private async Task ReconnectAsync(CancellationToken ct)
     {
         Disconnect();
 
-        var pipeName = ResolvePipeName();
-        _logger.LogDebug("Connecting to pipe '{PipeName}'...", pipeName);
-        _pipe = new NamedPipeClientStream(".", pipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
+        _logger.LogDebug("[{PipeName}] Connecting...", _pipeName);
+        _pipe = new NamedPipeClientStream(".", _pipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
 
         try
         {
@@ -261,24 +222,24 @@ public sealed class AvaloniaConnection : IDisposable
         }
         catch (TimeoutException)
         {
-            _logger.LogError("Timed out connecting to pipe '{PipeName}' after 5s. Is the Avalonia app still running?", pipeName);
+            _logger.LogError("[{PipeName}] Timed out connecting after 5s. Is the Avalonia app still running?", _pipeName);
             throw new TimeoutException(
-                $"Timed out connecting to pipe '{pipeName}' after 5 seconds. " +
+                $"Timed out connecting to pipe '{_pipeName}' after 5 seconds. " +
                 $"Verify the Avalonia app is still running and has .UseMcpDiagnostics() enabled.");
         }
 
-        var encoding = new System.Text.UTF8Encoding(false);
+        var encoding = new UTF8Encoding(false);
         _reader = new StreamReader(_pipe, encoding, false, 1024, leaveOpen: true);
         _writer = new StreamWriter(_pipe, encoding, 1024, leaveOpen: true) { AutoFlush = true };
         _validated = false;
-        _logger.LogInformation("Connected to pipe '{PipeName}'", pipeName);
+        _logger.LogInformation("[{PipeName}] Connected", _pipeName);
     }
 
     private void Disconnect()
     {
-        _reader?.Dispose();
-        _writer?.Dispose();
-        _pipe?.Dispose();
+        try { _reader?.Dispose(); } catch { }
+        try { _writer?.Dispose(); } catch { }
+        try { _pipe?.Dispose(); } catch { }
         _reader = null;
         _writer = null;
         _pipe = null;
@@ -289,48 +250,4 @@ public sealed class AvaloniaConnection : IDisposable
         Disconnect();
         _semaphore.Dispose();
     }
-
-    /// <summary>
-    /// Discover available Avalonia apps by checking temp discovery files.
-    /// </summary>
-    public static List<JsonDocument> DiscoverApps()
-    {
-        var dir = Path.Combine(Path.GetTempPath(), "avalonia-mcp");
-        if (!Directory.Exists(dir))
-            return [];
-
-        var apps = new List<JsonDocument>();
-        foreach (var file in Directory.GetFiles(dir, "*.json"))
-        {
-            try
-            {
-                var json = File.ReadAllText(file);
-                var doc = JsonDocument.Parse(json);
-
-                // Verify the process is still running
-                if (doc.RootElement.TryGetProperty("pid", out var pidEl))
-                {
-                    var pid = pidEl.GetInt32();
-                    try
-                    {
-                        System.Diagnostics.Process.GetProcessById(pid);
-                        apps.Add(doc);
-                    }
-                    catch
-                    {
-                        // Process no longer running — clean up
-                        File.Delete(file);
-                    }
-                }
-            }
-            catch { /* skip corrupt files */ }
-        }
-
-        return apps;
-    }
-}
-
-public sealed class ConnectionOptions
-{
-    public string? PipeName { get; set; }
 }

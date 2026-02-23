@@ -53,20 +53,12 @@ if (args.Length > 0 && args[0] == "cli")
 
 // Standard MCP server mode (stdio transport)
 // The server starts immediately — connection to an Avalonia app is lazy (on first tool call).
-var pipeName = GetArg(args, "--pipe") ?? GetArg(args, "-p");
-var pid = GetArg(args, "--pid");
-
-// If PID is specified, derive pipe name
-if (pipeName is null && pid is not null)
-    pipeName = $"avalonia-mcp-{pid}";
-
 var builder = Host.CreateApplicationBuilder(args);
 
 // MCP servers use stdio — redirect all logging to stderr
 builder.Logging.AddConsole(o => o.LogToStandardErrorThreshold = LogLevel.Trace);
 
-builder.Services.AddSingleton(new ConnectionOptions { PipeName = pipeName });
-builder.Services.AddSingleton<AvaloniaConnection>();
+builder.Services.AddSingleton<ConnectionPool>();
 
 builder.Services
     .AddMcpServer(options =>
@@ -116,6 +108,21 @@ static async Task RunCliAsync(string[] args)
         return;
     }
 
+    // discover_apps doesn't need a pipe connection
+    if (method == "discover_apps")
+    {
+        var apps = ConnectionPool.DiscoverApps();
+        var results = new List<System.Text.Json.Nodes.JsonObject>();
+        foreach (var app in apps)
+        {
+            var obj = JsonSerializer.Deserialize<System.Text.Json.Nodes.JsonObject>(app.RootElement.GetRawText())!;
+            results.Add(obj);
+            app.Dispose();
+        }
+        Console.WriteLine(JsonSerializer.Serialize(results, new JsonSerializerOptions { WriteIndented = true }));
+        return;
+    }
+
     var pipeName = GetArg(args, "--pipe") ?? GetArg(args, "-p");
     var pid = GetArg(args, "--pid");
 
@@ -124,7 +131,7 @@ static async Task RunCliAsync(string[] args)
 
     if (pipeName is null)
     {
-        var apps = AvaloniaConnection.DiscoverApps();
+        var apps = ConnectionPool.DiscoverApps();
         if (apps.Count == 1)
         {
             pipeName = apps[0].RootElement.GetProperty("pipeName").GetString();
@@ -137,7 +144,7 @@ static async Task RunCliAsync(string[] args)
         }
     }
 
-    using var connection = new AvaloniaConnection(new ConnectionOptions { PipeName = pipeName });
+    using var connection = new AvaloniaConnection(pipeName!);
 
     // Parse remaining args as parameters
     var parameters = new Dictionary<string, object?>();
