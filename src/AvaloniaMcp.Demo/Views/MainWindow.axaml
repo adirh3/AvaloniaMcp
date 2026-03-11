@@ -84,6 +84,25 @@
                 </StackPanel>
             </Border>
 
+            <!-- Scrollable Data (virtualized) -->
+            <Border Classes="card">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Scrollable Data (200 items, virtualized)" FontWeight="SemiBold"/>
+                    <ListBox Name="BigList" ItemsSource="{Binding BigItems}" MaxHeight="200">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:BigItem">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <TextBlock Text="{Binding Index, StringFormat='#{0}'}" Width="40" Foreground="#888"/>
+                                    <TextBlock Text="{Binding Label}" />
+                                    <TextBlock Text="{Binding Category}" Foreground="#666" FontStyle="Italic"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                    <TextBlock Text="{Binding BigItemsStatus}" FontSize="11" Foreground="#888"/>
+                </StackPanel>
+            </Border>
+
             <!-- Intentional binding error for testing -->
             <TextBlock Name="BrokenBinding" Text="{Binding NonExistentProperty}"
                        Foreground="Red" IsVisible="False"/>

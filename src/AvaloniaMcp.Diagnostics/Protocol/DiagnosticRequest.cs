@@ -42,6 +42,16 @@ public sealed class DiagnosticRequest
         return defaultValue;
     }
 
+    public double GetDouble(string key, double defaultValue = 0)
+    {
+        if (Params.TryGetPropertyValue(key, out var node) && node is not null)
+        {
+            try { return node.GetValue<double>(); }
+            catch { return defaultValue; }
+        }
+        return defaultValue;
+    }
+
     public List<string>? GetStringArray(string key)
     {
         if (Params.TryGetPropertyValue(key, out var node) && node is JsonArray arr)

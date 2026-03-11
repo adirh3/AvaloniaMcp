@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Windows.Input;
@@ -78,6 +79,14 @@ public class MainViewModel : INotifyPropertyChanged
         new("Review PR", false),
         new("Deploy to staging", false),
     ];
+
+    public ObservableCollection<BigItem> BigItems { get; } = new(Enumerable.Range(0, 200)
+        .Select(i => new BigItem(i, $"Item {i}: {Words[i % Words.Length]}", Categories[i % Categories.Length])));
+
+    private static readonly string[] Words = ["Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot", "Golf", "Hotel", "India", "Juliet"];
+    private static readonly string[] Categories = ["Fruit", "Vegetable", "Grain", "Dairy", "Protein"];
+
+    public string BigItemsStatus => $"{BigItems.Count} items in BigList";
 
     public ICommand IncrementCommand { get; }
     public ICommand ResetCommand { get; }
@@ -172,6 +181,8 @@ public class MainViewModel : INotifyPropertyChanged
     protected void OnPropertyChanged([CallerMemberName] string? name = null)
         => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 }
+
+public record BigItem(int Index, string Label, string Category);
 
 public class TodoItem : INotifyPropertyChanged
 {

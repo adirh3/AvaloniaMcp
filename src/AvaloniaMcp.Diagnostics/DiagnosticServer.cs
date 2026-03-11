@@ -243,6 +243,9 @@ public sealed class DiagnosticServer : IDisposable
             "invoke_command" => await InteractionHandler.InvokeCommand(request),
             "take_screenshot" => await InteractionHandler.TakeScreenshot(request),
             "wait_for_property" => await PropertyHandler.WaitForProperty(request),
+            "get_scroll_info" => await ScrollViewerHandler.Scroll(request),
+            "scroll" => await ScrollViewerHandler.Scroll(request),
+            "get_scrollable_items" => await ScrollViewerHandler.GetScrollableItems(request),
             "ping" => DiagnosticResponse.Ok(new JsonObject { ["status"] = J.Str("ok"), ["pid"] = J.Int(Environment.ProcessId), ["protocolVersion"] = J.Str(ProtocolVersion) }),
             _ => DiagnosticResponse.Fail($"Unknown method: {request.Method}"),
         };
@@ -252,7 +255,7 @@ public sealed class DiagnosticServer : IDisposable
     /// Protocol version for client-server compatibility checks.
     /// Bump this when the request/response format changes.
     /// </summary>
-    public const string ProtocolVersion = "0.3.0";
+    public const string ProtocolVersion = "0.4.0";
 
     private void WriteDiscoveryFile()
     {
