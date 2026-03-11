@@ -14,6 +14,7 @@ public sealed class PropertyTools
         [Description("Control identifier: '#Name' to find by Name, or 'TypeName[index]' to find by type.")] string controlId,
         [Description("Optional list of property names to return (e.g. ['Markdown', 'Text', 'IsVisible']). If omitted, returns all properties.")] string[]? propertyNames = null,
         [Description("Process ID of the Avalonia app to connect to. If omitted, auto-discovers.")] int? pid = null,
+        [Description("Maximum time in milliseconds to wait for the operation to complete. Default: 30000 (30s). Use 0 for no timeout.")] int timeoutMs = 30000,
         CancellationToken ct = default)
     {
         var p = new Dictionary<string, object?>
@@ -22,7 +23,7 @@ public sealed class PropertyTools
         };
         if (propertyNames is { Length: > 0 })
             p["propertyNames"] = propertyNames;
-        return await pool.RequestAsync("get_control_properties", p, pid, ct);
+        return await pool.RequestAsync("get_control_properties", p, pid: pid, timeoutMs: timeoutMs, ct: ct);
     }
 
     [McpServerTool(Name = "get_data_context", ReadOnly = true, Destructive = false),
@@ -33,6 +34,7 @@ public sealed class PropertyTools
         [Description("Name of a collection property to expand (e.g. 'Messages', 'Items'). Returns the actual items with their properties.")] string? expandProperty = null,
         [Description("Maximum number of items to return when expanding a collection. Default: 50.")] int maxItems = 50,
         [Description("Process ID of the Avalonia app to connect to. If omitted, auto-discovers.")] int? pid = null,
+        [Description("Maximum time in milliseconds to wait for the operation to complete. Default: 30000 (30s). Use 0 for no timeout.")] int timeoutMs = 30000,
         CancellationToken ct = default)
     {
         return await pool.RequestAsync("get_data_context", new()
@@ -40,7 +42,7 @@ public sealed class PropertyTools
             ["controlId"] = controlId,
             ["expandProperty"] = expandProperty,
             ["maxItems"] = maxItems,
-        }, pid, ct);
+        }, pid: pid, timeoutMs: timeoutMs, ct: ct);
     }
 
     [McpServerTool(Name = "get_applied_styles", ReadOnly = true, Destructive = false),
@@ -49,12 +51,13 @@ public sealed class PropertyTools
         ConnectionPool pool,
         [Description("Control identifier.")] string controlId,
         [Description("Process ID of the Avalonia app to connect to. If omitted, auto-discovers.")] int? pid = null,
+        [Description("Maximum time in milliseconds to wait for the operation to complete. Default: 30000 (30s). Use 0 for no timeout.")] int timeoutMs = 30000,
         CancellationToken ct = default)
     {
         return await pool.RequestAsync("get_applied_styles", new()
         {
             ["controlId"] = controlId,
-        }, pid, ct);
+        }, pid: pid, timeoutMs: timeoutMs, ct: ct);
     }
 
     [McpServerTool(Name = "get_resources", ReadOnly = true, Destructive = false),
@@ -63,12 +66,13 @@ public sealed class PropertyTools
         ConnectionPool pool,
         [Description("Control identifier. If omitted, returns application resources.")] string? controlId = null,
         [Description("Process ID of the Avalonia app to connect to. If omitted, auto-discovers.")] int? pid = null,
+        [Description("Maximum time in milliseconds to wait for the operation to complete. Default: 30000 (30s). Use 0 for no timeout.")] int timeoutMs = 30000,
         CancellationToken ct = default)
     {
         return await pool.RequestAsync("get_resources", new()
         {
             ["controlId"] = controlId,
-        }, pid, ct);
+        }, pid: pid, timeoutMs: timeoutMs, ct: ct);
     }
 
     [McpServerTool(Name = "wait_for_property", ReadOnly = true, Destructive = false),
@@ -83,6 +87,9 @@ public sealed class PropertyTools
         [Description("Process ID of the Avalonia app to connect to. If omitted, auto-discovers.")] int? pid = null,
         CancellationToken ct = default)
     {
+        // Transport timeout = poll timeout + buffer, so the handler's internal polling
+        // completes before the transport layer gives up.
+        var transportTimeout = timeoutMs > 0 ? timeoutMs + 5000 : 0;
         return await pool.RequestAsync("wait_for_property", new()
         {
             ["controlId"] = controlId,
@@ -90,7 +97,7 @@ public sealed class PropertyTools
             ["expectedValue"] = expectedValue,
             ["timeoutMs"] = timeoutMs,
             ["pollIntervalMs"] = pollIntervalMs,
-        }, pid, ct);
+        }, pid: pid, timeoutMs: transportTimeout, ct: ct);
     }
 
     [McpServerTool(Name = "get_binding_errors", ReadOnly = true, Destructive = false),
@@ -98,8 +105,9 @@ public sealed class PropertyTools
     public static async Task<string> GetBindingErrors(
         ConnectionPool pool,
         [Description("Process ID of the Avalonia app to connect to. If omitted, auto-discovers.")] int? pid = null,
+        [Description("Maximum time in milliseconds to wait for the operation to complete. Default: 30000 (30s). Use 0 for no timeout.")] int timeoutMs = 30000,
         CancellationToken ct = default)
     {
-        return await pool.RequestAsync("get_binding_errors", pid: pid, ct: ct);
+        return await pool.RequestAsync("get_binding_errors", pid: pid, timeoutMs: timeoutMs, ct: ct);
     }
 }

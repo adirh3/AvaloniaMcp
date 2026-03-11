@@ -41,10 +41,10 @@ public sealed class ConnectionPool : IDisposable
     /// Send a request to the app identified by pid (or auto-discovered).
     /// Returns formatted JSON string or error text.
     /// </summary>
-    public async Task<string> RequestAsync(string method, Dictionary<string, object?>? parameters = null, int? pid = null, CancellationToken ct = default)
+    public async Task<string> RequestAsync(string method, Dictionary<string, object?>? parameters = null, int? pid = null, int timeoutMs = AvaloniaConnection.DefaultTimeoutMs, CancellationToken ct = default)
     {
         var connection = GetConnection(pid);
-        var result = await connection.RequestAsync(method, parameters, ct);
+        var result = await connection.RequestAsync(method, parameters, timeoutMs, ct);
 
         // If the request failed with a pipe error, the process may have exited.
         // Evict the dead connection so the next call creates a fresh one.

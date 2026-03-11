@@ -13,12 +13,13 @@ public sealed class InteractionTools
         ConnectionPool pool,
         [Description("Control identifier: '#Name' or 'TypeName[index]'.")] string controlId,
         [Description("Process ID of the Avalonia app to connect to. If omitted, auto-discovers.")] int? pid = null,
+        [Description("Maximum time in milliseconds to wait for the operation to complete. Default: 30000 (30s). Use 0 for no timeout.")] int timeoutMs = 30000,
         CancellationToken ct = default)
     {
         return await pool.RequestAsync("click_control", new()
         {
             ["controlId"] = controlId,
-        }, pid, ct);
+        }, pid: pid, timeoutMs: timeoutMs, ct: ct);
     }
 
     [McpServerTool(Name = "set_property", ReadOnly = false, Destructive = false),
@@ -29,6 +30,7 @@ public sealed class InteractionTools
         [Description("Property name (e.g. 'IsVisible', 'Width', 'Margin', 'Content').")] string propertyName,
         [Description("Value as string. Will be converted to the property's type. For Thickness: '10' or '10,5' or '10,5,10,5'. For bool: 'true'/'false'. For enum: the enum name.")] string value,
         [Description("Process ID of the Avalonia app to connect to. If omitted, auto-discovers.")] int? pid = null,
+        [Description("Maximum time in milliseconds to wait for the operation to complete. Default: 30000 (30s). Use 0 for no timeout.")] int timeoutMs = 30000,
         CancellationToken ct = default)
     {
         return await pool.RequestAsync("set_property", new()
@@ -36,7 +38,7 @@ public sealed class InteractionTools
             ["controlId"] = controlId,
             ["propertyName"] = propertyName,
             ["value"] = value,
-        }, pid, ct);
+        }, pid: pid, timeoutMs: timeoutMs, ct: ct);
     }
 
     [McpServerTool(Name = "input_text", ReadOnly = false, Destructive = false),
@@ -47,6 +49,7 @@ public sealed class InteractionTools
         [Description("The text to enter.")] string text,
         [Description("If true, simulates pressing Enter after typing. Useful for submitting forms or sending messages.")] bool pressEnter = false,
         [Description("Process ID of the Avalonia app to connect to. If omitted, auto-discovers.")] int? pid = null,
+        [Description("Maximum time in milliseconds to wait for the operation to complete. Default: 30000 (30s). Use 0 for no timeout.")] int timeoutMs = 30000,
         CancellationToken ct = default)
     {
         return await pool.RequestAsync("input_text", new()
@@ -54,7 +57,7 @@ public sealed class InteractionTools
             ["controlId"] = controlId,
             ["text"] = text,
             ["pressEnter"] = pressEnter,
-        }, pid, ct);
+        }, pid: pid, timeoutMs: timeoutMs, ct: ct);
     }
 
     [McpServerTool(Name = "take_screenshot", ReadOnly = true, Destructive = false),
@@ -64,13 +67,14 @@ public sealed class InteractionTools
         [Description("Index of the window to capture. Default: 0.")] int windowIndex = 0,
         [Description("Control identifier to capture a specific control instead of the whole window.")] string? controlId = null,
         [Description("Process ID of the Avalonia app to connect to. If omitted, auto-discovers.")] int? pid = null,
+        [Description("Maximum time in milliseconds to wait for the operation to complete. Default: 30000 (30s). Use 0 for no timeout.")] int timeoutMs = 30000,
         CancellationToken ct = default)
     {
         return await pool.RequestAsync("take_screenshot", new()
         {
             ["windowIndex"] = windowIndex,
             ["controlId"] = controlId,
-        }, pid, ct);
+        }, pid: pid, timeoutMs: timeoutMs, ct: ct);
     }
 
     [McpServerTool(Name = "invoke_command", ReadOnly = false, Destructive = false),
@@ -82,6 +86,7 @@ public sealed class InteractionTools
         string commandName,
         [Description("Optional parameter to pass to the command's Execute method.")] string? parameter = null,
         [Description("Process ID of the Avalonia app to connect to. If omitted, auto-discovers.")] int? pid = null,
+        [Description("Maximum time in milliseconds to wait for the operation to complete. Default: 30000 (30s). Use 0 for no timeout.")] int timeoutMs = 30000,
         CancellationToken ct = default)
     {
         return await pool.RequestAsync("invoke_command", new()
@@ -89,6 +94,6 @@ public sealed class InteractionTools
             ["controlId"] = controlId,
             ["commandName"] = commandName,
             ["parameter"] = parameter,
-        }, pid, ct);
+        }, pid: pid, timeoutMs: timeoutMs, ct: ct);
     }
 }

@@ -13,9 +13,10 @@ public sealed class InspectionTools
     public static async Task<string> ListWindows(
         ConnectionPool pool,
         [Description("Process ID of the Avalonia app to connect to. Use discover_apps to find available PIDs. If omitted, auto-discovers (works when only one app is running).")] int? pid = null,
+        [Description("Maximum time in milliseconds to wait for the operation to complete. Default: 30000 (30s). Use 0 for no timeout. Increase if the app is under heavy load.")] int timeoutMs = 30000,
         CancellationToken ct = default)
     {
-        return await pool.RequestAsync("list_windows", pid: pid, ct: ct);
+        return await pool.RequestAsync("list_windows", pid: pid, timeoutMs: timeoutMs, ct: ct);
     }
 
     [McpServerTool(Name = "get_visual_tree", ReadOnly = true, Destructive = false),
@@ -26,6 +27,7 @@ public sealed class InspectionTools
         [Description("Control identifier: '#Name' to find by Name, or 'TypeName' / 'TypeName[index]' to find by type. If specified, shows the subtree rooted at this control.")] string? controlId = null,
         [Description("Maximum depth to traverse. Default: 10. Use lower values for large trees.")] int maxDepth = 10,
         [Description("Process ID of the Avalonia app to connect to. If omitted, auto-discovers.")] int? pid = null,
+        [Description("Maximum time in milliseconds to wait for the operation to complete. Default: 30000 (30s). Use 0 for no timeout.")] int timeoutMs = 30000,
         CancellationToken ct = default)
     {
         return await pool.RequestAsync("get_visual_tree", new()
@@ -33,7 +35,7 @@ public sealed class InspectionTools
             ["windowIndex"] = windowIndex,
             ["controlId"] = controlId,
             ["maxDepth"] = maxDepth,
-        }, pid: pid, ct: ct);
+        }, pid: pid, timeoutMs: timeoutMs, ct: ct);
     }
 
     [McpServerTool(Name = "get_logical_tree", ReadOnly = true, Destructive = false),
@@ -44,6 +46,7 @@ public sealed class InspectionTools
         [Description("Control identifier to scope the tree. '#Name' or 'TypeName[index]'.")] string? controlId = null,
         [Description("Maximum depth. Default: 10.")] int maxDepth = 10,
         [Description("Process ID of the Avalonia app to connect to. If omitted, auto-discovers.")] int? pid = null,
+        [Description("Maximum time in milliseconds to wait for the operation to complete. Default: 30000 (30s). Use 0 for no timeout.")] int timeoutMs = 30000,
         CancellationToken ct = default)
     {
         return await pool.RequestAsync("get_logical_tree", new()
@@ -51,7 +54,7 @@ public sealed class InspectionTools
             ["windowIndex"] = windowIndex,
             ["controlId"] = controlId,
             ["maxDepth"] = maxDepth,
-        }, pid: pid, ct: ct);
+        }, pid: pid, timeoutMs: timeoutMs, ct: ct);
     }
 
     [McpServerTool(Name = "find_control", ReadOnly = true, Destructive = false),
@@ -63,6 +66,7 @@ public sealed class InspectionTools
         [Description("Find controls displaying this text content (searches TextBlock, ContentControl, AccessText, HeaderedContentControl, etc.).")] string? text = null,
         [Description("Maximum results to return. Default: 20.")] int maxResults = 20,
         [Description("Process ID of the Avalonia app to connect to. If omitted, auto-discovers.")] int? pid = null,
+        [Description("Maximum time in milliseconds to wait for the operation to complete. Default: 30000 (30s). Use 0 for no timeout.")] int timeoutMs = 30000,
         CancellationToken ct = default)
     {
         return await pool.RequestAsync("find_control", new()
@@ -71,7 +75,7 @@ public sealed class InspectionTools
             ["typeName"] = typeName,
             ["text"] = text,
             ["maxResults"] = maxResults,
-        }, pid: pid, ct: ct);
+        }, pid: pid, timeoutMs: timeoutMs, ct: ct);
     }
 
     [McpServerTool(Name = "get_focused_element", ReadOnly = true, Destructive = false),
@@ -79,8 +83,9 @@ public sealed class InspectionTools
     public static async Task<string> GetFocusedElement(
         ConnectionPool pool,
         [Description("Process ID of the Avalonia app to connect to. If omitted, auto-discovers.")] int? pid = null,
+        [Description("Maximum time in milliseconds to wait for the operation to complete. Default: 30000 (30s). Use 0 for no timeout.")] int timeoutMs = 30000,
         CancellationToken ct = default)
     {
-        return await pool.RequestAsync("get_focused_element", pid: pid, ct: ct);
+        return await pool.RequestAsync("get_focused_element", pid: pid, timeoutMs: timeoutMs, ct: ct);
     }
 }

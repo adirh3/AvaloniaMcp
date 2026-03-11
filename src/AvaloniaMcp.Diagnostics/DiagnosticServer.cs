@@ -101,6 +101,12 @@ public sealed class DiagnosticServer : IDisposable
         }
     }
 
+    /// <summary>
+    /// Maximum time (ms) a handler dispatch is allowed to run before being abandoned.
+    /// Acts as a safety net for frozen UI threads that would block Dispatcher.UIThread.InvokeAsync forever.
+    /// </summary>
+    private const int HandlerTimeoutMs = 120_000;
+
     private async Task HandleClientAsync(NamedPipeServerStream pipe, CancellationToken ct)
     {
         try
@@ -144,9 +150,23 @@ public sealed class DiagnosticServer : IDisposable
                 }
 
                 DiagnosticResponse response;
+                var sw = Stopwatch.StartNew();
                 try
                 {
-                    response = await DispatchAsync(request);
+                    using var handlerCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                    handlerCts.CancelAfter(HandlerTimeoutMs);
+                    response = await DispatchAsync(request).WaitAsync(handlerCts.Token);
+                }
+                catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+                {
+                    sw.Stop();
+                    // NOTE: This response is usually not delivered — the MCP client's transport
+                    // timeout (default 30s) fires first, disconnecting the pipe. This serves as
+                    // a safety net to unblock the handler loop and log the issue.
+                    Log($"Handler for '{request.Method}' timed out after {sw.ElapsedMilliseconds}ms — UI thread may be frozen");
+                    response = DiagnosticResponse.Fail(
+                        $"Handler '{request.Method}' timed out after {sw.ElapsedMilliseconds}ms. " +
+                        $"The UI thread is likely blocked.");
                 }
                 catch (Exception ex)
                 {

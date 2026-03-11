@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Threading;
 using System.Windows.Input;
 
 namespace AvaloniaMcp.Demo.ViewModels;
@@ -82,6 +83,10 @@ public class MainViewModel : INotifyPropertyChanged
     public ICommand ResetCommand { get; }
     public ICommand AddItemCommand { get; }
     public ICommand CrashCommand { get; }
+    public ICommand FreezeUiCommand { get; }
+    public ICommand InfiniteLoopCommand { get; }
+    public ICommand BackgroundHangCommand { get; }
+    public ICommand DelayedCrashCommand { get; }
 
     public MainViewModel()
     {
@@ -112,6 +117,55 @@ public class MainViewModel : INotifyPropertyChanged
         CrashCommand = new RelayCommand(() =>
         {
             throw new InvalidOperationException("This is a test crash triggered by the Crash button!");
+        });
+
+        // Freezes the UI thread for 60 seconds via Thread.Sleep.
+        // MCP calls should time out and report the UI thread as frozen.
+        FreezeUiCommand = new RelayCommand(() =>
+        {
+            StatusMessage = "Freezing UI thread for 60s...";
+            Thread.Sleep(60_000);
+            StatusMessage = "UI thread unfroze!";
+        });
+
+        // Infinite busy loop on the UI thread — CPU pegged at 100%, UI completely stuck.
+        // Only way to recover is to kill the process.
+        InfiniteLoopCommand = new RelayCommand(() =>
+        {
+            StatusMessage = "Entering infinite loop...";
+            long i = 0;
+            while (true) { i++; } // intentional infinite loop for testing
+        });
+
+        // Starts a background task that blocks, then tries to update the UI.
+        // The UI stays responsive but the StatusMessage shows "waiting..." forever.
+        BackgroundHangCommand = new RelayCommand(() =>
+        {
+            StatusMessage = "Background task started (will hang)...";
+            Task.Run(() =>
+            {
+                // Simulate a background operation that hangs (e.g. deadlocked HTTP call)
+                using var cts = new CancellationTokenSource();
+                try { Task.Delay(Timeout.Infinite, cts.Token).Wait(); }
+                catch { }
+            });
+        });
+
+        // Crashes the app after a short delay — tests the crash file detection.
+        // Uses a raw Thread (not Task.Run) so the unhandled exception triggers
+        // AppDomain.CurrentDomain.UnhandledException → WriteCrashFile before process death.
+        DelayedCrashCommand = new RelayCommand(() =>
+        {
+            StatusMessage = "App will crash in 3 seconds...";
+            var crashThread = new Thread(() =>
+            {
+                Thread.Sleep(3000);
+                throw new InvalidOperationException(
+                    "Delayed crash! This simulates an unhandled background exception. " +
+                    "Stack trace and exception details should appear in the MCP crash report.");
+            })
+            { IsBackground = true, Name = "MCP-CrashTest" };
+            crashThread.Start();
         });
     }
 

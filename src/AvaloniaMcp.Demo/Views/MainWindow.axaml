@@ -88,6 +88,29 @@
             <TextBlock Name="BrokenBinding" Text="{Binding NonExistentProperty}"
                        Foreground="Red" IsVisible="False"/>
 
+            <!-- Stress Test / Hang / Crash Scenarios -->
+            <Border Classes="card">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="⚠ Stress Tests (will break things!)" FontWeight="SemiBold" Foreground="Red"/>
+                    <TextBlock Text="Use these to test MCP timeout diagnostics. Some will freeze or kill the app."
+                               FontSize="11" Foreground="#888" TextWrapping="Wrap"/>
+                    <WrapPanel Orientation="Horizontal">
+                        <Button Name="FreezeUiBtn" Content="🧊 Freeze UI (60s)"
+                                Command="{Binding FreezeUiCommand}"
+                                Background="#FF6600" Foreground="White" Margin="0,0,8,4"/>
+                        <Button Name="InfiniteLoopBtn" Content="♾️ Infinite Loop"
+                                Command="{Binding InfiniteLoopCommand}"
+                                Background="#CC0000" Foreground="White" Margin="0,0,8,4"/>
+                        <Button Name="BackgroundHangBtn" Content="⏳ Background Hang"
+                                Command="{Binding BackgroundHangCommand}"
+                                Background="#996600" Foreground="White" Margin="0,0,8,4"/>
+                        <Button Name="DelayedCrashBtn" Content="💥 Delayed Crash (3s)"
+                                Command="{Binding DelayedCrashCommand}"
+                                Background="#880000" Foreground="White" Margin="0,0,8,4"/>
+                    </WrapPanel>
+                </StackPanel>
+            </Border>
+
             <!-- Status Bar -->
             <Border Background="#E0E0E0" CornerRadius="4" Padding="8">
                 <TextBlock Name="StatusBar" Text="{Binding StatusMessage}"
